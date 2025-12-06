@@ -27,12 +27,12 @@
   - Stable diagnostic IDs/messages/spans for unknown identifiers, type errors, wrong arity, duplicates, intrinsic misuse.
   - JSON span invariants validated across fixtures and clamped to source bounds.
 - [ ] **M7: Snapshots and Integration**
-  - Semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
-  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1-SM5 using this repo's `samples/` as sources.
-  - CLI smoke for stdin/file IO and option handling.
+  - Semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer/structured resource cases).
+  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1-SM5 using this repo's `samples/` as sources; env-gated DXSDK full sweep.
+  - CLI smoke for stdin/file IO and required options; snapshot baselines kept in repo.
 - [ ] **M8: Tooling and CI**
-  - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites.
-  - Docs/README kept in sync; devlogs recorded; release checklist established.
+  - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites and DXSDK sweep toggle.
+  - Docs/README/compatibility matrix kept in sync; devlogs recorded; release checklist established.
 - [ ] **M9: Release Readiness (Semantic Parity)**
-  - Semantic coverage per `docs/TDD.md` across SM1-SM5; no known crashers; stable outputs.
-  - Compatibility notes and regression suite locked.
+  - Semantic coverage per `docs/TDD.md` across SM1-SM5, including SM4/5 cbuffer/tbuffer and structured/RW resources; no known crashers; stable outputs and diagnostics.
+  - FX construct stance documented (supported or diagnosed); compatibility matrix locked; regression suite green.

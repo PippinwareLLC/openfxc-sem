@@ -9,28 +9,31 @@
 - [x] Collect symbols for globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
 - [x] Capture parent/child relationships (e.g., parameters under functions) and declaration node links.
 - [ ] Tests: symbol presence for each category across SM1-SM5.
+- [ ] SM4/SM5 resource shapes: capture cbuffer/tbuffer contents and structured/RW resources with normalized types.
 
 ## Type System
 - [x] Type construction for scalars, vectors, matrices, arrays, resource types, and function signatures (structured SemType).
 - [x] Expression inference for arithmetic, swizzles, indexing, calls, constructors, casts.
 - [x] Tests: positive and negative inference cases; mismatches flagged with diagnostics (constructor overfill, binary mismatch, array declarators).
+- [ ] SM4/SM5 type coverage for structured/RW resources and cbuffer/tbuffer members.
 
 ## Intrinsics and Builtins
 - [x] Implement intrinsic table (initial set: mul, dot, normalize, saturate, tex2D).
 - [x] Type-check intrinsic calls, enforce argument counts, and choose result types deterministically.
 - [x] Tests: correct usages per intrinsic plus negative misuse (bad arity/types).
-- [ ] Extend coverage to more intrinsics and texture variants (SM3+/SM4+).
+- [ ] Extend coverage to more intrinsics and texture variants (SM3+/SM4+), including SM4/SM5 resource overloads.
 
 ## Semantics and Entry Points
-- [ ] Normalize legacy semantics (POSITION0, COLOR0) and SV_* forms; associate indices where present, validate against stage/profile. (Basic uppercasing and SM4 system-value guards done; broaden validation/index handling.)
+- [ ] Normalize legacy semantics (POSITION0, COLOR0) and SV_* forms; associate indices where present, validate against stage/profile. (Basic uppercasing and SM4 system-value guards done; broaden validation/index handling, legacy vs SV compatibility per stage/profile.)
 - [x] Bind parameter/return semantics and record in symbols/types; uppercase normalization applied.
 - [x] Entry resolution: default main or --entry, stage derived from profile (with diagnostic when missing).
-- [ ] Tests: parameter/return semantics validation, SV targets, entry selection/ambiguity, missing/invalid semantics diagnostics. (Initial coverage for normalization, missing/duplicate semantics, missing entry; expand stage/profile cases.)
+- [ ] Tests: parameter/return semantics validation, SV targets, entry selection/ambiguity, missing/invalid semantics diagnostics. (Initial coverage for normalization, missing/duplicate semantics, missing entry; expand stage/profile cases across SM1-SM5.)
+- [ ] FX constructs: either compute technique/pass semantics or document/diagnose non-support; add tests to lock behavior.
 
 ## Profile Awareness
 - [x] Carry profile metadata through analysis for entry-point stage mapping.
-- [ ] Optional guards for profile/semantic mismatches (e.g., SV semantics under SM2-only).
-- [ ] Tests: profile propagation and any enforced guardrails.
+- [ ] Optional guards for profile/semantic mismatches (e.g., SV semantics under SM2-only, stage-semantic compatibility).
+- [ ] Tests: profile propagation and enforced guardrails across SM1-SM5.
 
 ## Diagnostics
 - [x] Unknown identifier, type mismatch, wrong argument count, duplicate symbol, intrinsic misuse.
@@ -38,10 +41,11 @@
 - [ ] Tests: targeted negative cases and snapshot stability.
 
 ## Integration and Snapshots
-- [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
-- [ ] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated).
+- [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer, SM5 structured/RW resource cases).
+- [ ] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated; full sweep via env opt-in).
 - [ ] CLI smoke tests for stdin/file IO and required options (--profile, --entry).
 - [ ] Source fixtures from samples/ in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
+- [ ] Compatibility matrix kept in sync with snapshot coverage and SM-era feature completion.
 
 ## Tooling and CI
 - [ ] Test runner scripts (tests/run-all.* ) covering unit, negative, snapshot, and CLI smoke suites.
