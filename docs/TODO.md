@@ -41,9 +41,9 @@
 - [ ] Tests: targeted negative cases and snapshot stability.
 
 ## Integration and Snapshots
-- [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer, SM5 structured/RW resource cases).
-- [ ] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated; full sweep via env opt-in).
-- [ ] CLI smoke tests for stdin/file IO and required options (--profile, --entry).
+- [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer, SM5 structured/RW resource cases). (Initial snapshots added for SM2 VS/PS and SM4 cbuffer.)
+- [x] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated; full sweep via env opt-in).
+- [x] CLI smoke tests for stdin/file IO and required options (--profile, --entry).
 - [ ] Source fixtures from samples/ in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
 - [ ] Compatibility matrix kept in sync with snapshot coverage and SM-era feature completion.
 

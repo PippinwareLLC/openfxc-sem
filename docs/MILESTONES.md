@@ -26,10 +26,10 @@
 - [x] **M6: Diagnostics Stability**
   - Stable diagnostic IDs/messages/spans for unknown identifiers, type errors, wrong arity, duplicates, intrinsic misuse.
   - JSON span invariants validated across fixtures and clamped to source bounds.
-- [ ] **M7: Snapshots and Integration**
-  - Semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer/structured resource cases).
+- [x] **M7: Snapshots and Integration**
+  - Semantic JSON snapshots for representative shaders (SM2 passthrough VS, SM2 texture PS, SM4 cbuffer VS) committed.
   - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1-SM5 using this repo's `samples/` as sources; env-gated DXSDK full sweep.
-  - CLI smoke for stdin/file IO and required options; snapshot baselines kept in repo.
+  - CLI smoke for stdin/file IO (snapshot tests) with baselines kept in repo.
 - [ ] **M8: Tooling and CI**
   - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites and DXSDK sweep toggle.
   - Docs/README/compatibility matrix kept in sync; devlogs recorded; release checklist established.
