@@ -106,6 +106,39 @@ float4 main(float4 pos : SV_POSITION) : SV_Target { return pos; }";
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
     }
 
+    [Fact]
+    public void Sm4_vertex_must_return_sv_position()
+    {
+        var source = @"
+float4 main(float4 p : POSITION) : SV_Target { return p; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_4_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Fact]
+    public void Sm4_pixel_return_sv_position_reports_error()
+    {
+        var source = @"
+float4 main(float2 uv : SV_Position) : SV_Position { return float4(uv, 0, 1); }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_4_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Fact]
+    public void Sm4_pixel_return_sv_target_is_allowed()
+    {
+        var source = @"
+float4 main(float2 uv : SV_Position) : SV_Target { return float4(uv, 0, 1); }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_4_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

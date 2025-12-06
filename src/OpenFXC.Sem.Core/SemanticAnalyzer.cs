@@ -1850,6 +1850,11 @@ internal static class SemanticValidator
                     inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.", span);
                 }
             }
+
+            if (smMajor >= 4 && !IsReturnSemanticAllowed(stage, semantic.Name))
+            {
+                inference.AddDiagnostic("HLSL3002", $"Semantic '{semantic.Name}' is not valid for {stage} shader return in SM{smMajor}.", span);
+            }
         }
 
         private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference, Span? span)
@@ -1867,15 +1872,20 @@ internal static class SemanticValidator
                 inference.AddDiagnostic("HLSL3002", $"Pixel shader parameter semantic '{name}' is not valid for SM{smMajor}. Use legacy TEXCOORD/COLOR semantics.", span);
             }
 
-            if (stage == "Pixel" && string.Equals(name, "SV_POSITION", StringComparison.OrdinalIgnoreCase))
+            if (smMajor < 4 && stage == "Pixel" && string.Equals(name, "SV_POSITION", StringComparison.OrdinalIgnoreCase))
             {
                 inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).", span);
             }
-    }
 
-    private static bool IsSystemValue(string name) => name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase);
+            if (smMajor >= 4 && !IsParameterSemanticAllowed(stage, name))
+            {
+                inference.AddDiagnostic("HLSL3002", $"Semantic '{name}' is not valid for {stage} shader parameters in SM{smMajor}.", span);
+            }
+        }
 
-    private static string SemanticKey(SemanticInfo? semantic)
+        private static bool IsSystemValue(string name) => name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase);
+
+        private static string SemanticKey(SemanticInfo? semantic)
     {
         if (semantic is null) return string.Empty;
         return $"{semantic.Name}:{semantic.Index ?? 0}";
@@ -1893,10 +1903,32 @@ internal static class SemanticValidator
         if (parts.Length >= 2 && int.TryParse(parts[1].Split('.')[0], out var major))
         {
             return major;
+            }
+            return 0;
         }
-        return 0;
+
+        private static bool IsParameterSemanticAllowed(string stage, string name)
+        {
+            var upper = name.ToUpperInvariant();
+            return stage switch
+            {
+                "Pixel" => upper is "SV_POSITION" or "SV_PRIMITIVEID" or "SV_SAMPLEINDEX" or "SV_ISFRONTFACE" or "SV_RENDERTARGETARRAYINDEX",
+                "Vertex" => upper is "SV_VERTEXID" or "SV_INSTANCEID" or "SV_POSITION",
+                _ => true // Other stages are left permissive for now.
+            };
+        }
+
+        private static bool IsReturnSemanticAllowed(string stage, string name)
+        {
+            var upper = name.ToUpperInvariant();
+            return stage switch
+            {
+                "Pixel" => upper is "SV_TARGET" or "SV_TARGET0" or "SV_TARGET1" or "SV_TARGET2" or "SV_TARGET3" or "SV_TARGET4" or "SV_TARGET5" or "SV_TARGET6" or "SV_TARGET7" or "SV_DEPTH" or "SV_COVERAGE",
+                "Vertex" => upper is "SV_POSITION",
+                _ => true // Other stages are left permissive for now.
+            };
+        }
     }
-}
 
 internal sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChild> Children)
 {
