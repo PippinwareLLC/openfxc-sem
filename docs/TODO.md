@@ -40,6 +40,7 @@
 - [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
 - [ ] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1–SM5.
 - [ ] CLI smoke tests for stdin/file IO and required options (`--profile`, `--entry`).
+- [ ] Source fixtures from `samples/` in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
 
 ## Tooling and CI
 - [ ] Test runner scripts (`tests/run-all.*`) covering unit, negative, snapshot, and CLI smoke suites.

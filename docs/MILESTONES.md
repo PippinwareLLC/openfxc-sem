@@ -28,7 +28,7 @@
   - JSON span invariants validated across fixtures.
 - [ ] **M7: Snapshots and Integration**
   - Semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
-  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1–SM5.
+  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1–SM5 using this repo's `samples/` as sources.
   - CLI smoke for stdin/file IO and option handling.
 - [ ] **M8: Tooling and CI**
   - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites.

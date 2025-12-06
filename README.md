@@ -23,6 +23,7 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
   openfxc-hlsl parse file.hlsl --format json > file.ast.json
   openfxc-sem analyze --profile vs_3_0 < file.ast.json > file.sem.json
   ```
+- AST inputs are produced by the `openfxc-hlsl` submodule (see `openfxc-hlsl/`), keeping parsing and semantics decoupled.
 
 ## Semantic Model (output)
 High-level shape of `output.sem.json`:
@@ -56,8 +57,19 @@ High-level shape of `output.sem.json`:
 - Run all tests: `dotnet test tests/OpenFXC.Sem.Tests/OpenFXC.Sem.Tests.csproj`
 - Convenience: `tests/run-all.cmd` (Windows) or `tests/run-all.sh` (bash)
 - Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests). The suite is scaffolded; expand alongside semantic features per `docs/TDD.md`.
+- Sample shaders for tests live under `samples/` (owned by this repo); generate AST fixtures from them via the `openfxc-hlsl` submodule before semantic snapshotting.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`
 - Work queue: `docs/TODO.md`
 - Milestones: `docs/MILESTONES.md`
+
+## Compatibility Matrix (Semantics)
+
+| Shader Model / Era | Semantics Coverage | Notes |
+| --- | --- | --- |
+| SM1.x (legacy D3D9) | Planned/early | Symbols/types/semantics for legacy samplers/textures and basic expressions; no backend decisions |
+| SM2.x / SM3.x | Planned/early | Parameter/return semantics, sampler/resource symbols, intrinsic resolution for texture math; backend-agnostic |
+| SM4.x | Planned/early | cbuffer/tbuffer symbols, resource types, semantics binding (including SV_*), entry resolution |
+| SM5.x | Planned/early | Structured/RW resources, semantics binding, intrinsics/type inference; backend-agnostic |
+| FX constructs (.fx) | Planned/early | Technique/pass semantics not computed; semantic analysis focuses on shader entry functions |
