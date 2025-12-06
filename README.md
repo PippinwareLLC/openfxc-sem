@@ -95,6 +95,6 @@ High-level shape of `output.sem.json`:
 | --- | --- | --- |
 | SM1.x (legacy D3D9) | Early | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape validation with diagnostics; semantics normalized/bound; entryPoints emitted; backend-agnostic |
 | SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; semantics normalized/bound with basic stage/profile guards; entryPoints emitted; backend-agnostic |
-| SM4.x | In progress | cbuffer symbols/members captured; semantics binding (including SV_*); stronger type inference planned; snapshots included |
-| SM5.x | In progress | Structured/RW resources recognized; broaden intrinsic/type coverage planned; snapshots included |
-| FX constructs (.fx) | Early | Shader entry analysis only; technique/pass semantics not computed |
+| SM4.x | In progress | cbuffer symbols/members captured; semantics binding (including SV_*); snapshots included; backend-agnostic |
+| SM5.x | In progress | Structured/RW resources recognized; snapshots included; backend-agnostic |
+| FX constructs (.fx) | Early | Shader entry analysis only; technique/pass semantics not computed (diagnosed as unsupported) |

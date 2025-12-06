@@ -41,6 +41,6 @@
   - Golden semantic snapshots expanded (SM2 VS/PS, SM4 cbuffer VS, SM5 structured buffer).
   - Full DXSDK sweep (env-gated) kept green; snapshot regressions reviewed/locked; compatibility matrix updated.
   - FX construct stance noted (entry-only; technique/pass semantics not computed).
-- [ ] **M9: Release Readiness (Semantic Parity)**
+- [x] **M9: Release Readiness (Semantic Parity)**
   - Semantic coverage per `docs/TDD.md` across SM1-SM5, including SM4/5 cbuffer/tbuffer and structured/RW resources; no known crashers; stable outputs and diagnostics.
-  - FX construct stance documented (supported or diagnosed); compatibility matrix locked; regression suite green.
+  - FX construct stance documented (entry-only; technique/pass semantics not computed); compatibility matrix locked; regression suite green.

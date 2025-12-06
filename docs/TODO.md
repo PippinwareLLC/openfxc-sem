@@ -45,7 +45,7 @@
 - [x] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated; full sweep via env opt-in).
 - [x] CLI smoke tests for stdin/file IO and required options (--profile, --entry).
 - [ ] Source fixtures from samples/ in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
-- [ ] Compatibility matrix kept in sync with snapshot coverage and SM-era feature completion.
+- [x] Compatibility matrix kept in sync with snapshot coverage and SM-era feature completion.
 
 ## Tooling and CI
 - [x] Test runner scripts (tests/run-all.* ) covering unit, negative, snapshot, and CLI smoke suites (DXSDK sweep gated via env).
