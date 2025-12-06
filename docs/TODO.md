@@ -5,6 +5,18 @@
 - [x] Establish semantic JSON schema (formatVersion, profile metadata, symbols, types, entryPoints, diagnostics) and pin sample outputs (smoke tests cover shape).
 - [x] Stabilize diagnostic IDs/messages (e.g., HLSL2xxx), spans, and error recovery so partial models are always produced.
 
+## Library Split (M8.3)
+- [x] Create class library project `src/OpenFXC.Sem.Core/OpenFXC.Sem.Core.csproj`.
+- [x] Move semantic analyzer types (SemanticAnalyzer, SymbolBuilder, TokenLookup, TypeInference, Intrinsics, SemType/TypeCompatibility, ExpressionTypeAnalyzer, EntryPointResolver, SemanticValidator) into the core library.
+- [x] Expose output-facing records as public: SemanticOutput, SyntaxInfo, EntryPointInfo, SymbolInfo, SemanticInfo, TypeInfo, DiagnosticInfo, DiagnosticSpan.
+- [x] Keep helper types internal: TokenLookup, TypeCollector, IntrinsicSignature, SemType, TypeInference, etc.
+- [x] Add a public entry point in the core (e.g., `SemanticAnalyzer.Analyze()` instance method; optional `SemanticApi` static wrapper if desired).
+- [x] Add ProjectReference from CLI to core; remove analyzer code from CLI project.
+- [x] Refactor CLI `Program.cs` to thin wrapper: parse args, read input, instantiate SemanticAnalyzer, serialize output.
+- [ ] Update tests to build core once and reference the library; ensure no CLI duplication.
+- [x] Update README with library usage (namespace/API sample) and build instructions reflecting the split.
+- [ ] Add devlog entry and mark TODO/MILESTONES complete when done.
+
 ## Symbol Table
 - [x] Collect symbols for globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
 - [x] Capture parent/child relationships (e.g., parameters under functions) and declaration node links.
@@ -52,3 +64,4 @@
 - [x] Update README and docs as surfaces evolve; keep TODO/MILESTONES in sync with progress.
 - [x] Add devlog entries for significant changes and test runs.
 - [x] Release checklist added (`docs/RELEASE_CHECKLIST.md`).
+- [ ] Add build/use docs for the new semantic core library (namespace/API sample) and ensure CLI references it.

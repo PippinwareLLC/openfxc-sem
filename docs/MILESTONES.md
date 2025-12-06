@@ -41,6 +41,10 @@
   - Golden semantic snapshots expanded (SM2 VS/PS, SM4 cbuffer VS, SM5 structured buffer).
   - Full DXSDK sweep (env-gated) kept green; snapshot regressions reviewed/locked; compatibility matrix updated.
   - FX construct stance noted (entry-only; technique/pass semantics not computed).
+- [x] **M8.3: Library Split**
+  - Create core library project (`src/OpenFXC.Sem.Core`), move analyzer types there, and expose public output records.
+  - Keep helper types internal; provide public entry point to run analysis.
+  - CLI (`src/openfxc-sem`) references core and remains a thin wrapper; tests updated to use the library; docs updated with library usage/build.
 - [x] **M9: Release Readiness (Semantic Parity)**
   - Semantic coverage per `docs/TDD.md` across SM1-SM5, including SM4/5 cbuffer/tbuffer and structured/RW resources; no known crashers; stable outputs and diagnostics.
   - FX construct stance documented (entry-only; technique/pass semantics not computed); compatibility matrix locked; regression suite green.

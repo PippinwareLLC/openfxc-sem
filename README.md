@@ -39,9 +39,16 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
   ```
   Reference the project directly or the built DLL to consume the lexer/parser from other tools.
 
+## Semantic core (library)
+- Core library: `src/OpenFXC.Sem.Core/OpenFXC.Sem.Core.csproj` produces `OpenFXC.Sem.Core.dll` with the analyzer API.
+- Public entry point: `var analyzer = new SemanticAnalyzer(profile: "vs_3_0", entry: "main", inputJson); var output = analyzer.Analyze();`
+- Input JSON should come from `openfxc-hlsl` (do not synthesize ASTs manually). You can call the parser API directly and pass the serialized AST string to the analyzer without writing to disk.
+- CLI wrapper (`src/openfxc-sem/openfxc-sem.csproj`) references the core library and just handles argument parsing and I/O.
+
 ## Build
 - Prereq: initialize the parser submodule: `git submodule update --init --recursive`
-- Build (Debug): `dotnet build src/openfxc-sem/openfxc-sem.csproj`
+- Build core (Debug): `dotnet build src/OpenFXC.Sem.Core/OpenFXC.Sem.Core.csproj`
+- Build CLI (Debug): `dotnet build src/openfxc-sem/openfxc-sem.csproj`
 - Build (Release single-file):
   - Windows (x64): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true`
   - Linux (x64): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r linux-x64 -p:PublishSingleFile=true -p:SelfContained=true`
