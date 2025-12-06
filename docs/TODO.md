@@ -3,7 +3,7 @@
 ## Foundation
 - [x] Stand up `openfxc-sem analyze` CLI that reads `openfxc-hlsl` AST JSON from stdin/file and emits semantic JSON per `docs/TDD.md`.
 - [x] Establish semantic JSON schema (formatVersion, profile metadata, symbols, types, entryPoints, diagnostics) and pin sample outputs (smoke tests cover shape).
-- [ ] Stabilize diagnostic IDs/messages (e.g., HLSL2xxx), spans, and error recovery so partial models are always produced.
+- [x] Stabilize diagnostic IDs/messages (e.g., HLSL2xxx), spans, and error recovery so partial models are always produced.
 
 ## Symbol Table
 - [x] Collect symbols for globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
@@ -33,8 +33,8 @@
 - [ ] Tests: profile propagation and any enforced guardrails.
 
 ## Diagnostics
-- [ ] Unknown identifier, type mismatch, wrong argument count, duplicate symbol, intrinsic misuse.
-- [ ] JSON span stability (0 <= start <= end <= length) across all diagnostics and semantic bindings.
+- [x] Unknown identifier, type mismatch, wrong argument count, duplicate symbol, intrinsic misuse.
+- [x] JSON span stability (0 <= start <= end <= length) across all diagnostics and semantic bindings.
 - [ ] Tests: targeted negative cases and snapshot stability.
 
 ## Integration and Snapshots

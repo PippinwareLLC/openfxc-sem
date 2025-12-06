@@ -47,6 +47,34 @@ float4 main() : SV_Target
         Assert.True(end >= start);
     }
 
+    [Fact]
+    public void All_diagnostics_include_valid_spans_within_source()
+    {
+        var source = @"
+float4 main(float2 a : POSITION0) : SV_Position
+{
+    float3 v = float3(1, 2, 3, 4);
+    float3 w = a + float3(1, 2, 3);
+    return missingThing;
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2002");
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2005");
+
+        foreach (var diag in diagnostics)
+        {
+            Assert.True(diag.TryGetProperty("span", out var span));
+            var start = span.GetProperty("start").GetInt32();
+            var end = span.GetProperty("end").GetInt32();
+            Assert.True(start >= 0);
+            Assert.True(end >= start);
+            Assert.True(end <= source.Length, $"Diagnostic {diag.GetProperty("id").GetString()} end {end} exceeds source length {source.Length}.");
+        }
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         var hlslPath = Path.Combine(Path.GetTempPath(), $"openfxc-sem-inline-{Guid.NewGuid():N}.hlsl");

@@ -23,16 +23,16 @@
 - [x] **M5: Profile Awareness**
   - Profile metadata propagated; stage derived from profile; system-value semantics guarded on pre-SM4; basic stage/semantic guards.
   - Tests for profile propagation and enforced rules via semantics validation.
-- [ ] **M6: Diagnostics Stability**
+- [x] **M6: Diagnostics Stability**
   - Stable diagnostic IDs/messages/spans for unknown identifiers, type errors, wrong arity, duplicates, intrinsic misuse.
-  - JSON span invariants validated across fixtures.
+  - JSON span invariants validated across fixtures and clamped to source bounds.
 - [ ] **M7: Snapshots and Integration**
   - Semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
-  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1–SM5 using this repo's `samples/` as sources.
+  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1-SM5 using this repo's `samples/` as sources.
   - CLI smoke for stdin/file IO and option handling.
 - [ ] **M8: Tooling and CI**
   - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites.
   - Docs/README kept in sync; devlogs recorded; release checklist established.
 - [ ] **M9: Release Readiness (Semantic Parity)**
-  - Semantic coverage per `docs/TDD.md` across SM1–SM5; no known crashers; stable outputs.
+  - Semantic coverage per `docs/TDD.md` across SM1-SM5; no known crashers; stable outputs.
   - Compatibility notes and regression suite locked.

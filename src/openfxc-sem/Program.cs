@@ -154,6 +154,7 @@ internal static class Program
                 var root = doc.RootElement;
                 rootId = TryGetRootId(root);
                 var tokens = TokenLookup.From(root);
+                _typeInference.SetDocumentLength(tokens.DocumentLength);
                 if (root.TryGetProperty("root", out var rootNodeEl))
                 {
                     var rootNode = NodeInfo.FromJson(rootNodeEl);
@@ -513,10 +514,12 @@ internal static class Program
     private sealed class TokenLookup
     {
         private readonly List<TokenInfo> _tokens;
+        private readonly int _documentEnd;
 
         private TokenLookup(List<TokenInfo> tokens)
         {
             _tokens = tokens;
+            _documentEnd = tokens.Count == 0 ? 0 : tokens.Max(t => t.End);
         }
 
         public static TokenLookup From(JsonElement root)
@@ -534,6 +537,8 @@ internal static class Program
             }
             return new TokenLookup(tokens);
         }
+
+        public int DocumentLength => _documentEnd;
 
         public string? GetChildIdentifierText(NodeInfo node, string role)
         {
@@ -1226,6 +1231,7 @@ internal static class Program
     {
         private readonly Dictionary<int, SemType> _nodeTypes = new();
         private readonly List<DiagnosticInfo> _diagnostics = new();
+        private int? _documentLength;
 
         public SemType? ParseType(string? type)
         {
@@ -1250,6 +1256,11 @@ internal static class Program
 
         public string NormalizeFunctionType(SemType returnType, IReadOnlyList<SemType> parameters) =>
             SemType.Function(returnType, parameters).ToNormalizedString() ?? string.Empty;
+
+        public void SetDocumentLength(int length)
+        {
+            _documentLength = length >= 0 ? length : null;
+        }
 
         public void AddNodeType(int? nodeId, SemType? type)
         {
@@ -1285,11 +1296,29 @@ internal static class Program
                 Severity = "Error",
                 Id = id,
                 Message = message,
-                Span = span is null ? null : new DiagnosticSpan { Start = span.Value.Start, End = span.Value.End }
+                Span = NormalizeSpan(span)
             });
         }
 
         public IReadOnlyList<DiagnosticInfo> Diagnostics => _diagnostics;
+
+        private DiagnosticSpan? NormalizeSpan(Span? span)
+        {
+            if (span is null)
+            {
+                return null;
+            }
+
+            var start = Math.Max(0, span.Value.Start);
+            var end = Math.Max(start, span.Value.End);
+            if (_documentLength is int length)
+            {
+                start = Math.Min(start, length);
+                end = Math.Min(end, length);
+            }
+
+            return new DiagnosticSpan { Start = start, End = end };
+        }
     }
 
     private static class ExpressionTypeAnalyzer
