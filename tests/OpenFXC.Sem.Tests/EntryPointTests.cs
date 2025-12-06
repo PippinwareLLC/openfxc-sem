@@ -139,6 +139,23 @@ float4 main(float2 uv : SV_Position) : SV_Target { return float4(uv, 0, 1); }";
         Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
     }
 
+    [Fact]
+    public void Fx_technique_emits_diagnostic()
+    {
+        var source = @"
+float4 main(float4 p : POSITION) : SV_Position { return p; }
+
+technique T {
+    pass P {
+        VertexShader = compile vs_2_0 main();
+    }
+};";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL5001");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

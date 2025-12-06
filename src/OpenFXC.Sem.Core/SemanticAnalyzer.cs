@@ -37,6 +37,7 @@ public sealed class SemanticAnalyzer
             if (root.TryGetProperty("root", out var rootNodeEl))
             {
                 var rootNode = NodeInfo.FromJson(rootNodeEl);
+                AddFxDiagnostics(rootNode, _typeInference);
                 var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                 ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
                 entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference, build.Spans);
@@ -66,19 +67,37 @@ public sealed class SemanticAnalyzer
         };
     }
 
-    private static int? TryGetRootId(JsonElement root)
-    {
-        if (root.TryGetProperty("root", out var rootElement))
+        private static int? TryGetRootId(JsonElement root)
         {
-            if (rootElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var id))
+            if (root.TryGetProperty("root", out var rootElement))
+            {
+                if (rootElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var id))
             {
                 return id;
             }
+            }
+
+            return null;
         }
 
-        return null;
+        private static void AddFxDiagnostics(NodeInfo rootNode, TypeInference inference)
+        {
+            void Traverse(NodeInfo node)
+            {
+                if (node.Kind is not null && (node.Kind.Contains("Technique", StringComparison.OrdinalIgnoreCase) || node.Kind.Contains("Pass", StringComparison.OrdinalIgnoreCase)))
+                {
+                    inference.AddDiagnostic("HLSL5001", "FX constructs (technique/pass) semantics are not supported; shader entry analysis only.", node.Span);
+                }
+
+                foreach (var child in node.Children)
+                {
+                    Traverse(child.Node);
+                }
+            }
+
+            Traverse(rootNode);
+        }
     }
-}
 
 internal static class SymbolBuilder
 {

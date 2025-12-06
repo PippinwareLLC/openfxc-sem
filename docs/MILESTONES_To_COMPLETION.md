@@ -5,20 +5,20 @@
   - [x] Broaden intrinsic coverage for SM1–3 era builtins/texture ops.
   - [x] Add targeted tests locking stage/profile semantic rules and intrinsic behaviors.
 
-- [ ] **MSC2: SM4 completion**
+- [x] **MSC2: SM4 completion**
   - [x] Stage 1: Finish semantics binding/validation for all SV_* cases with stage/profile guards (SM4-only), with focused tests.
   - [x] Stage 2: Expand SM4 intrinsic/resource coverage and add positive/negative tests.
   - [x] Stage 3: Refresh/add SM4 snapshots (VS/PS with SV_* semantics, cbuffer/tbuffer) plus negative cases.
   - [x] Stage 4: Update docs/compatibility matrix and mark SM4 complete.
 
-- [ ] **MSC3: SM5 completion**
+- [x] **MSC3: SM5 completion**
   - [x] Complete structured/RW resource edge cases and intrinsic/type coverage.
   - [x] Add SM5 snapshots and negative tests to lock behavior.
   - [x] Ensure profile-aware semantics validation matches SM5 expectations.
 
-- [ ] **MSC4: FX constructs (.fx) stance**
-  - [ ] Decide on technique/pass semantics: implement or explicitly diagnose/disable.
-  - [ ] Document stance and add tests to lock behavior.
+- [x] **MSC4: FX constructs (.fx) stance**
+  - [x] Decide on technique/pass semantics: implement or explicitly diagnose/disable.
+  - [x] Document stance and add tests to lock behavior.
 
 - [ ] **MSC5: Docs & test backstops**
   - [ ] Update compatibility matrix, TODO, dev logs as milestones close.
