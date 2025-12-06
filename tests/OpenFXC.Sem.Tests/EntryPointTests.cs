@@ -156,6 +156,62 @@ technique T {
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL5001");
     }
 
+    [Fact]
+    public void Sm2_vertex_param_sv_target_reports_error()
+    {
+        var source = @"
+float4 main(float4 p : SV_Target) : POSITION { return p; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Fact]
+    public void Sm2_pixel_param_sv_position_reports_error()
+    {
+        var source = @"
+float4 main(float4 p : SV_Position) : COLOR0 { return p; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Fact]
+    public void Sm2_pixel_legacy_semantics_are_allowed()
+    {
+        var source = @"
+float4 main(float2 uv : TEXCOORD0, float4 c : COLOR0) : COLOR1 { return c; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Theory]
+    [InlineData("ps_2_0", true)]
+    [InlineData("ps_3_0", true)]
+    [InlineData("ps_4_0", false)]
+    [InlineData("vs_2_0", true)]
+    public void Profile_guardrails_enforced_for_sv_in_sm2_sm3(string profile, bool expectError)
+    {
+        var source = @"
+float4 main(float4 p : SV_POSITION) : SV_Target { return p; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, profile));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        var hasError = diagnostics.Any(d => d.GetProperty("id").GetString() == "HLSL3002");
+        if (expectError)
+        {
+            Assert.True(hasError);
+        }
+        else
+        {
+            Assert.False(hasError);
+        }
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

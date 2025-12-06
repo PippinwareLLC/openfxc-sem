@@ -784,6 +784,12 @@ internal static class Intrinsics
         },
         new IntrinsicSignature
         {
+            Name = "tex2D",
+            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 3) },
+            ReturnResolver = _ => SemType.Vector("float", 4)
+        },
+        new IntrinsicSignature
+        {
             Name = "sin",
             Parameters = new [] { SemType.Scalar("float") },
             ReturnResolver = args => args.FirstOrDefault()

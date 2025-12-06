@@ -15,12 +15,12 @@
 - [x] Refactor CLI `Program.cs` to thin wrapper: parse args, read input, instantiate SemanticAnalyzer, serialize output.
 - [x] Update tests to build core once and reference the library; ensure no CLI duplication.
 - [x] Update README with library usage (namespace/API sample) and build instructions reflecting the split.
-- [ ] Add devlog entry and mark TODO/MILESTONES complete when done.
+- [x] Add devlog entry and mark TODO/MILESTONES complete when done.
 
 ## Symbol Table
 - [x] Collect symbols for globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
 - [x] Capture parent/child relationships (e.g., parameters under functions) and declaration node links.
-- [ ] Tests: symbol presence for each category across SM1-SM5.
+- [x] Tests: symbol presence for each category across SM1-SM5.
 - [x] SM4/SM5 resource shapes: capture cbuffer/tbuffer contents and structured/RW resources with normalized types.
 
 ## Type System
@@ -45,7 +45,7 @@
 ## Profile Awareness
 - [x] Carry profile metadata through analysis for entry-point stage mapping.
 - [x] Optional guards for profile/semantic mismatches (e.g., SV semantics under SM2-only, stage-semantic compatibility).
-- [ ] Tests: profile propagation and enforced guardrails across SM1-SM5.
+- [x] Tests: profile propagation and enforced guardrails across SM1-SM5.
 
 ## Diagnostics
 - [x] Unknown identifier, type mismatch, wrong argument count, duplicate symbol, intrinsic misuse.
