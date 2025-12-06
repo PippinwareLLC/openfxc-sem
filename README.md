@@ -70,7 +70,7 @@ High-level shape of `output.sem.json`:
 - Run all tests: `dotnet test tests/OpenFXC.Sem.Tests/OpenFXC.Sem.Tests.csproj`
 - Convenience: `tests/run-all.cmd` (Windows) or `tests/run-all.sh` (bash)
 - Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests). The suite is scaffolded; expand alongside semantic features per `docs/TDD.md`.
-- Sample shaders for tests live under `samples/` (owned by this repo); generate AST fixtures from them via the `openfxc-hlsl` submodule before semantic snapshotting.
+- Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`

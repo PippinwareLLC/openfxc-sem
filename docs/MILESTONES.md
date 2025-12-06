@@ -4,7 +4,7 @@
   - CLI skeleton for `openfxc-sem analyze` with stdin/file IO and JSON output per `docs/TDD.md`.
   - Semantic JSON schema drafted and sample outputs captured.
   - Basic smoke run wiring.
-- [ ] **M1: Symbol Table Baseline**
+- [x] **M1: Symbol Table Baseline**
   - Collect globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
   - Parent-child relationships and declaration node links recorded.
   - Unit tests for symbol presence across simple shaders.

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -38,18 +39,8 @@ internal static class Program
         }
 
         var inputJson = ReadAllInput(options.InputPath);
-        var syntaxRootId = TryGetRootId(inputJson);
-
-        var output = new SemanticOutput
-        {
-            FormatVersion = 1,
-            Profile = options.Profile!,
-            Syntax = syntaxRootId is null ? null : new SyntaxInfo { RootId = syntaxRootId.Value },
-            Symbols = Array.Empty<SymbolInfo>(),
-            Types = Array.Empty<TypeInfo>(),
-            EntryPoints = Array.Empty<EntryPointInfo>(),
-            Diagnostics = Array.Empty<DiagnosticInfo>()
-        };
+        var analyzer = new SemanticAnalyzer(options.Profile!, options.Entry ?? "main", inputJson);
+        var output = analyzer.Analyze();
 
         var writerOptions = new JsonSerializerOptions
         {
@@ -114,27 +105,6 @@ internal static class Program
         return File.ReadAllText(inputPath);
     }
 
-    private static int? TryGetRootId(string json)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("root", out var rootElement))
-            {
-                if (rootElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var id))
-                {
-                    return id;
-                }
-            }
-        }
-        catch
-        {
-            // Swallow parse errors here; diagnostics will be empty in M0.
-        }
-
-        return null;
-    }
-
     private static void PrintUsage()
     {
         Console.Error.WriteLine("Usage: openfxc-sem analyze --profile <name> [--entry <name>] [--input <path>] < input.ast.json > output.sem.json");
@@ -154,6 +124,505 @@ internal static class Program
             return true;
         }
     }
+
+    private sealed class SemanticAnalyzer
+    {
+        private readonly string _profile;
+        private readonly string _entry;
+        private readonly string _inputJson;
+
+        public SemanticAnalyzer(string profile, string entry, string inputJson)
+        {
+            _profile = profile;
+            _entry = entry;
+            _inputJson = inputJson;
+        }
+
+        public SemanticOutput Analyze()
+        {
+            int? rootId = null;
+            List<SymbolInfo> symbols = new();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(_inputJson);
+                var root = doc.RootElement;
+                rootId = TryGetRootId(root);
+                symbols = SymbolBuilder.Build(root);
+            }
+            catch
+            {
+                // On parse failure, emit minimal model with empty symbols.
+                symbols = new List<SymbolInfo>();
+            }
+
+            return new SemanticOutput
+            {
+                FormatVersion = 1,
+                Profile = _profile,
+                Syntax = rootId is null ? null : new SyntaxInfo { RootId = rootId.Value },
+                Symbols = symbols,
+                Types = Array.Empty<TypeInfo>(),
+                EntryPoints = Array.Empty<EntryPointInfo>(),
+                Diagnostics = Array.Empty<DiagnosticInfo>()
+            };
+        }
+
+        private static int? TryGetRootId(JsonElement root)
+        {
+            if (root.TryGetProperty("root", out var rootElement))
+            {
+                if (rootElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var id))
+                {
+                    return id;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    private static class SymbolBuilder
+    {
+        public static List<SymbolInfo> Build(JsonElement root)
+        {
+            if (!root.TryGetProperty("root", out var rootNodeEl))
+            {
+                return new List<SymbolInfo>();
+            }
+
+            var tokens = TokenLookup.From(root);
+            var rootNode = NodeInfo.FromJson(rootNodeEl);
+            var symbols = new List<SymbolInfo>();
+            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, tokens);
+            return symbols.OrderBy(s => s.Id ?? int.MaxValue).ToList();
+        }
+
+        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TokenLookup tokens)
+        {
+            switch (node.Kind)
+            {
+                case "FunctionDeclaration":
+                    HandleFunction(node, symbols, tokens);
+                    currentFunctionId = node.Id;
+                    break;
+                case "Parameter":
+                    {
+                        var param = BuildParameterSymbol(node, tokens, currentFunctionId);
+                        if (param is not null)
+                        {
+                            symbols.Add(param);
+                        }
+                    }
+                    break;
+                case "VariableDeclaration":
+                    {
+                        var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens);
+                        if (variable is not null)
+                        {
+                            symbols.Add(variable);
+                        }
+                    }
+                    break;
+                case "StructDeclaration":
+                    {
+                        var structSym = BuildStructSymbol(node, tokens);
+                        if (structSym is not null)
+                        {
+                            symbols.Add(structSym);
+                            currentStructId = structSym.Id;
+                        }
+                    }
+                    break;
+                case "CBufferDeclaration":
+                    {
+                        var cbufSym = BuildCBufferSymbol(node, tokens);
+                        if (cbufSym is not null)
+                        {
+                            symbols.Add(cbufSym);
+                            currentStructId = cbufSym.Id;
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            foreach (var child in node.Children)
+            {
+                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, tokens);
+            }
+        }
+
+        private static void HandleFunction(NodeInfo node, List<SymbolInfo> symbols, TokenLookup tokens)
+        {
+            if (node.Id is null) return;
+            var name = tokens.GetChildIdentifierText(node, "identifier");
+            var returnType = tokens.GetChildTypeText(node, "type") ?? "void";
+
+            var parameterTypes = new List<string>();
+            foreach (var child in node.Children.Where(c => string.Equals(c.Role, "parameter", StringComparison.OrdinalIgnoreCase)))
+            {
+                var pType = tokens.GetChildTypeText(child.Node, "type");
+                if (!string.IsNullOrWhiteSpace(pType))
+                {
+                    parameterTypes.Add(pType!);
+                }
+            }
+
+            var funcType = BuildFunctionType(returnType, parameterTypes);
+            symbols.Add(new SymbolInfo
+            {
+                Id = node.Id,
+                Kind = "Function",
+                Name = name,
+                Type = funcType,
+                DeclNodeId = node.Id
+            });
+        }
+
+        private static SymbolInfo? BuildParameterSymbol(NodeInfo node, TokenLookup tokens, int? parentSymbolId)
+        {
+            if (node.Id is null) return null;
+            var name = tokens.GetChildIdentifierText(node, "identifier");
+            var type = tokens.GetChildTypeText(node, "type");
+            var semanticText = tokens.GetAnnotationText(node);
+            var semantic = ParseSemanticString(semanticText);
+
+            if (node.Span is not null && (name is null || type is null || TokenLookup.IsModifier(type) || string.Equals(name, type, StringComparison.OrdinalIgnoreCase)))
+            {
+                (name, type) = tokens.InferParameterNameAndType(node.Span.Value, fallbackName: name, fallbackType: type);
+            }
+
+            if (semantic is null && node.Span is not null)
+            {
+                semantic = tokens.InferSemantic(node.Span.Value);
+            }
+
+            return new SymbolInfo
+            {
+                Id = node.Id,
+                Kind = "Parameter",
+                Name = name,
+                Type = type,
+                DeclNodeId = node.Id,
+                ParentSymbolId = parentSymbolId,
+                Semantic = semantic
+            };
+        }
+
+        private static SymbolInfo? BuildVariableSymbol(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, TokenLookup tokens)
+        {
+            if (node.Id is null) return null;
+
+            var name = tokens.GetChildIdentifierText(node, "identifier");
+            var type = tokens.GetChildTypeText(node, "type");
+            var semantic = ParseSemanticString(tokens.GetAnnotationText(node));
+
+            var kind = parentKind switch
+            {
+                "CompilationUnit" => ClassifyGlobalKind(type),
+                "TypeBody" => "StructMember",
+                _ when currentFunctionId is not null => "LocalVariable",
+                _ => "LocalVariable"
+            };
+
+            var parentSymbolId = parentKind == "TypeBody" ? currentStructId : currentFunctionId;
+
+            return new SymbolInfo
+            {
+                Id = node.Id,
+                Kind = kind,
+                Name = name,
+                Type = type,
+                DeclNodeId = node.Id,
+                ParentSymbolId = parentSymbolId,
+                Semantic = semantic
+            };
+        }
+
+        private static string ClassifyGlobalKind(string? type)
+        {
+            if (!string.IsNullOrWhiteSpace(type) && type.StartsWith("sampler", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Sampler";
+            }
+            if (!string.IsNullOrWhiteSpace(type) && type.StartsWith("texture", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Resource";
+            }
+            return "GlobalVariable";
+        }
+
+        private static SymbolInfo? BuildStructSymbol(NodeInfo node, TokenLookup tokens)
+        {
+            if (node.Id is null) return null;
+            var name = tokens.GetChildIdentifierText(node, "identifier");
+            return new SymbolInfo
+            {
+                Id = node.Id,
+                Kind = "Struct",
+                Name = name,
+                DeclNodeId = node.Id
+            };
+        }
+
+        private static SymbolInfo? BuildCBufferSymbol(NodeInfo node, TokenLookup tokens)
+        {
+            if (node.Id is null) return null;
+            var name = tokens.GetChildIdentifierText(node, "identifier");
+            return new SymbolInfo
+            {
+                Id = node.Id,
+                Kind = "CBuffer",
+                Name = name,
+                DeclNodeId = node.Id
+            };
+        }
+
+        private static string BuildFunctionType(string returnType, IReadOnlyList<string> parameterTypes)
+        {
+            var parameters = string.Join(", ", parameterTypes);
+            return $"{returnType}({parameters})";
+        }
+
+        private static SemanticInfo? ParseSemanticString(string? semantic)
+        {
+            if (string.IsNullOrWhiteSpace(semantic))
+            {
+                return null;
+            }
+
+            var span = semantic.AsSpan();
+            var i = span.Length - 1;
+            while (i >= 0 && char.IsDigit(span[i]))
+            {
+                i--;
+            }
+
+            var namePart = span[..(i + 1)].ToString();
+            int? index = null;
+            if (i < span.Length - 1)
+            {
+                var indexPart = span[(i + 1)..].ToString();
+                if (int.TryParse(indexPart, out var idx))
+                {
+                    index = idx;
+                }
+            }
+
+            index ??= 0;
+            return new SemanticInfo { Name = namePart, Index = index };
+        }
+    }
+
+    private sealed class TokenLookup
+    {
+        private readonly List<TokenInfo> _tokens;
+
+        private TokenLookup(List<TokenInfo> tokens)
+        {
+            _tokens = tokens;
+        }
+
+        public static TokenLookup From(JsonElement root)
+        {
+            var tokens = new List<TokenInfo>();
+            if (root.TryGetProperty("tokens", out var tokensEl) && tokensEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var token in tokensEl.EnumerateArray())
+                {
+                    if (!TryGetSpan(token, out var span)) continue;
+                    var text = token.TryGetProperty("text", out var tEl) ? tEl.GetString() : null;
+                    if (text is null) continue;
+                    tokens.Add(new TokenInfo(span.Start, span.End, text));
+                }
+            }
+            return new TokenLookup(tokens);
+        }
+
+        public string? GetChildIdentifierText(NodeInfo node, string role)
+        {
+            foreach (var child in node.Children)
+            {
+                if (!string.Equals(child.Role, role, StringComparison.OrdinalIgnoreCase)) continue;
+                if (child.Node.Span is null) continue;
+                var text = GetText(child.Node.Span.Value);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+            return null;
+        }
+
+        public string? GetChildTypeText(NodeInfo node, string role)
+        {
+            foreach (var child in node.Children)
+            {
+                if (!string.Equals(child.Role, role, StringComparison.OrdinalIgnoreCase)) continue;
+                if (child.Node.Span is null) continue;
+                var text = GetText(child.Node.Span.Value);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+            return null;
+        }
+
+        public string? GetAnnotationText(NodeInfo node)
+        {
+            foreach (var child in node.Children)
+            {
+                if (!string.Equals(child.Role, "annotation", StringComparison.OrdinalIgnoreCase)) continue;
+                if (child.Node.Span is null) continue;
+                var text = GetText(child.Node.Span.Value);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+            return null;
+        }
+
+        private string? GetText(Span span)
+        {
+            var text = string.Concat(_tokens
+                .Where(t => t.Start >= span.Start && t.End <= span.End)
+                .OrderBy(t => t.Start)
+                .Select(t => t.Text));
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+
+        public (string? name, string? type) InferParameterNameAndType(Span span, string? fallbackName, string? fallbackType)
+        {
+            var tokens = GetTokens(span);
+            var beforeColon = tokens.TakeWhile(t => t.Text != ":").ToList();
+            var filtered = beforeColon.Where(t => !IsModifier(t.Text)).ToList();
+
+            string? candidateType = null;
+            string? candidateName = null;
+
+            if (filtered.Count >= 2)
+            {
+                candidateType = filtered[^2].Text;
+                candidateName = filtered[^1].Text;
+            }
+            else if (filtered.Count == 1)
+            {
+                candidateType = filtered[0].Text;
+                candidateName = filtered[0].Text;
+            }
+
+            var afterTokens = GetNextTokens(span.End, 3);
+            var afterIdent = afterTokens.FirstOrDefault(t => !IsDelimiter(t.Text));
+            if (afterIdent.Text is not null && candidateName == candidateType)
+            {
+                candidateName = afterIdent.Text;
+            }
+
+            var chosenType = (!string.IsNullOrWhiteSpace(fallbackType) && !IsModifier(fallbackType))
+                ? fallbackType
+                : candidateType ?? fallbackType;
+
+            var useCandidateName = string.IsNullOrWhiteSpace(fallbackName)
+                || string.Equals(fallbackName, candidateType, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(fallbackName, fallbackType, StringComparison.OrdinalIgnoreCase);
+
+            var chosenName = useCandidateName ? candidateName : fallbackName ?? candidateName;
+
+            return (chosenName, chosenType);
+        }
+
+        private List<TokenInfo> GetTokens(Span span)
+        {
+            return _tokens
+                .Where(t => t.Start >= span.Start && t.End <= span.End)
+                .OrderBy(t => t.Start)
+                .ToList();
+        }
+
+        private List<TokenInfo> GetNextTokens(int position, int count)
+        {
+            return _tokens.Where(t => t.Start >= position).OrderBy(t => t.Start).Take(count).ToList();
+        }
+
+        public SemanticInfo? InferSemantic(Span span)
+        {
+            var tokens = GetNextTokens(span.End, 4);
+            var colonIndex = tokens.FindIndex(t => t.Text == ":");
+            if (colonIndex >= 0 && colonIndex + 1 < tokens.Count)
+            {
+                var nameText = tokens[colonIndex + 1].Text;
+                return new SemanticInfo { Name = nameText, Index = 0 };
+            }
+
+            return null;
+        }
+
+        internal static bool IsModifier(string text)
+        {
+            return string.Equals(text, "in", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "out", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(text, "inout", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsDelimiter(string text)
+        {
+            return text is ":" or "," or ")" or "(";
+        }
+
+        internal static bool TryGetSpan(JsonElement element, out Span span)
+        {
+            span = default;
+            if (!element.TryGetProperty("span", out var spanEl)) return false;
+            if (!spanEl.TryGetProperty("start", out var sEl) || !sEl.TryGetInt32(out var start)) return false;
+            if (!spanEl.TryGetProperty("end", out var eEl) || !eEl.TryGetInt32(out var end)) return false;
+            span = new Span(start, end);
+            return true;
+        }
+
+        private readonly record struct TokenInfo(int Start, int End, string Text);
+    }
+
+    private sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChild> Children)
+    {
+        public static NodeInfo FromJson(JsonElement element)
+        {
+            int? id = null;
+            if (element.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var idVal))
+            {
+                id = idVal;
+            }
+
+            string? kind = element.TryGetProperty("kind", out var kEl) ? kEl.GetString() : null;
+            Span? span = null;
+            if (TokenLookup.TryGetSpan(element, out var s))
+            {
+                span = s;
+            }
+
+            var children = new List<NodeChild>();
+            if (element.TryGetProperty("children", out var childrenEl) && childrenEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var child in childrenEl.EnumerateArray())
+                {
+                    var role = child.TryGetProperty("role", out var rEl) ? rEl.GetString() : string.Empty;
+                    if (child.TryGetProperty("node", out var nodeEl))
+                    {
+                        children.Add(new NodeChild(role ?? string.Empty, FromJson(nodeEl)));
+                    }
+                }
+            }
+
+            return new NodeInfo(id, kind, span, children);
+        }
+    }
+
+    private readonly record struct NodeChild(string Role, NodeInfo Node);
+
+    private readonly record struct Span(int Start, int End);
 
     private sealed record SemanticOutput
     {
@@ -185,7 +654,38 @@ internal static class Program
         public int RootId { get; init; }
     }
 
-    private sealed record SymbolInfo;
+    private sealed record SymbolInfo
+    {
+        [JsonPropertyName("id")]
+        public int? Id { get; init; }
+
+        [JsonPropertyName("kind")]
+        public string? Kind { get; init; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; init; }
+
+        [JsonPropertyName("type")]
+        public string? Type { get; init; }
+
+        [JsonPropertyName("declNodeId")]
+        public int? DeclNodeId { get; init; }
+
+        [JsonPropertyName("parentSymbolId")]
+        public int? ParentSymbolId { get; init; }
+
+        [JsonPropertyName("semantic")]
+        public SemanticInfo? Semantic { get; init; }
+    }
+
+    private sealed record SemanticInfo
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; init; } = string.Empty;
+
+        [JsonPropertyName("index")]
+        public int? Index { get; init; }
+    }
 
     private sealed record TypeInfo;
 

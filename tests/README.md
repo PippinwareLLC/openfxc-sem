@@ -5,6 +5,7 @@ Suite layout mirrors `openfxc-hlsl`:
 - `fixtures/`: small HLSL AST inputs (JSON) and expected diagnostics.
 - `snapshots/`: golden semantic JSON outputs for representative shaders across SM1–SM5.
 - `run-all.*`: convenience scripts to run the full suite locally.
+- Integration smoke currently parses DXSDK sample shaders via the `openfxc-hlsl` submodule (e.g., `samples/dxsdk/.../snow.fx`) to produce ASTs before semantic analysis.
 
 Run locally:
 - Windows: `tests\\run-all.cmd`
