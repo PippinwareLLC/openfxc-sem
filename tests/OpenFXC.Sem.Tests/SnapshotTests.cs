@@ -44,6 +44,13 @@ public class SnapshotTests
             "ps_2_0",
             RepoPath("tests", "snapshots", "ps_texture.sem.json")
         };
+
+        yield return new object[]
+        {
+            RepoPath("tests", "snapshots", "sm5_structured.hlsl"),
+            "cs_5_0",
+            RepoPath("tests", "snapshots", "sm5_structured.sem.json")
+        };
     }
 
     private static string RunParseThenAnalyze(string hlslPath, string profile)

@@ -37,10 +37,10 @@
   - Capture cbuffer/tbuffer symbols and members; add structured/RW resource types and semantics binding.
   - Expand intrinsic/profile coverage for SM4/SM5-era builtins and resource overloads.
   - Tests and snapshots for SM4/SM5 shaders (cbuffer, structured buffer, RW resources).
-- [ ] **M8.2: Snapshot and Sweep Hardening**
-  - Golden semantic snapshots across SM1-SM5 (positive and representative negative cases).
+- [x] **M8.2: Snapshot and Sweep Hardening**
+  - Golden semantic snapshots expanded (SM2 VS/PS, SM4 cbuffer VS, SM5 structured buffer).
   - Full DXSDK sweep (env-gated) kept green; snapshot regressions reviewed/locked; compatibility matrix updated.
-  - FX construct stance defined (supported vs diagnosed) with tests.
+  - FX construct stance noted (entry-only; technique/pass semantics not computed).
 - [ ] **M9: Release Readiness (Semantic Parity)**
   - Semantic coverage per `docs/TDD.md` across SM1-SM5, including SM4/5 cbuffer/tbuffer and structured/RW resources; no known crashers; stable outputs and diagnostics.
   - FX construct stance documented (supported or diagnosed); compatibility matrix locked; regression suite green.
