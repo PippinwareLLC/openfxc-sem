@@ -52,9 +52,10 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
 - Build (Release single-file):
   - Windows (x64): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true`
   - Linux (x64): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r linux-x64 -p:PublishSingleFile=true -p:SelfContained=true`
-  - macOS Intel: `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r osx-x64 -p:PublishSingleFile=true -p:SelfContained=true`
+- macOS Intel: `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r osx-x64 -p:PublishSingleFile=true -p:SelfContained=true`
   - macOS Apple Silicon: `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r osx-arm64 -p:PublishSingleFile=true -p:SelfContained=true`
 - Artifacts land under `src/openfxc-sem/bin/<Configuration>/net8.0/<rid>/publish/`; add `-p:PublishTrimmed=true` if you want smaller binaries (verify before distributing).
+- AOT (no single-file): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r win-x64 -p:PublishAot=true -p:SelfContained=true` (do not combine `PublishAot` with `PublishSingleFile`). System.Text.Json will warn under trim/AOT; use a source-generated `JsonSerializerContext` if you need to suppress it.
 
 ## Semantic Model (output)
 High-level shape of `output.sem.json`:
@@ -90,6 +91,7 @@ High-level shape of `output.sem.json`:
 - Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests).
 - Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
 - Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
+- Latest full run: 1314 tests, 0 failed, 0 skipped (16.2s).
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`
