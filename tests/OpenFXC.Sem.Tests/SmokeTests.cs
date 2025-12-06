@@ -17,7 +17,7 @@ public class SmokeTests
         using var doc = JsonDocument.Parse(semJson);
         var root = doc.RootElement;
 
-        Assert.Equal(2, root.GetProperty("formatVersion").GetInt32());
+        Assert.Equal(3, root.GetProperty("formatVersion").GetInt32());
         Assert.Equal("vs_2_0", root.GetProperty("profile").GetString());
 
         Assert.True(root.TryGetProperty("syntax", out var syntax));
@@ -99,7 +99,7 @@ public class SmokeTests
         using var doc = JsonDocument.Parse(semJson);
         var root = doc.RootElement;
 
-        Assert.Equal(2, root.GetProperty("formatVersion").GetInt32());
+        Assert.Equal(3, root.GetProperty("formatVersion").GetInt32());
         Assert.True(root.GetProperty("symbols").ValueKind == JsonValueKind.Array);
         Assert.True(root.GetProperty("syntax").GetProperty("rootId").GetInt32() > 0);
     }

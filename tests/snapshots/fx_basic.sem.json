@@ -1,8 +1,614 @@
 {
-  "formatVersion": 2,
+  "formatVersion": 3,
   "profile": "vs_2_0",
   "syntax": {
-    "rootId": 45
+    "rootId": 45,
+    "nodes": [
+      {
+        "id": 45,
+        "kind": "CompilationUnit",
+        "span": {
+          "start": 0,
+          "end": 230
+        },
+        "children": [
+          {
+            "role": "declaration",
+            "nodeId": 13
+          },
+          {
+            "role": "declaration",
+            "nodeId": 44
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "kind": "FunctionDeclaration",
+        "span": {
+          "start": 0,
+          "end": 60
+        },
+        "children": [
+          {
+            "role": "type",
+            "nodeId": 1
+          },
+          {
+            "role": "identifier",
+            "nodeId": 2
+          },
+          {
+            "role": "parameter",
+            "nodeId": 7
+          },
+          {
+            "role": "annotation",
+            "nodeId": 8
+          },
+          {
+            "role": "body",
+            "nodeId": 12
+          }
+        ]
+      },
+      {
+        "id": 1,
+        "kind": "Type",
+        "span": {
+          "start": 0,
+          "end": 6
+        },
+        "children": []
+      },
+      {
+        "id": 2,
+        "kind": "Identifier",
+        "span": {
+          "start": 7,
+          "end": 11
+        },
+        "children": []
+      },
+      {
+        "id": 7,
+        "kind": "Parameter",
+        "span": {
+          "start": 12,
+          "end": 31
+        },
+        "children": [
+          {
+            "role": "type",
+            "nodeId": 3
+          },
+          {
+            "role": "identifier",
+            "nodeId": 4
+          },
+          {
+            "role": "annotation",
+            "nodeId": 5
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "kind": "Type",
+        "span": {
+          "start": 12,
+          "end": 18
+        },
+        "children": []
+      },
+      {
+        "id": 4,
+        "kind": "Identifier",
+        "span": {
+          "start": 19,
+          "end": 20
+        },
+        "children": []
+      },
+      {
+        "id": 5,
+        "kind": "Annotation",
+        "span": {
+          "start": 21,
+          "end": 31
+        },
+        "children": [
+          {
+            "role": "token",
+            "nodeId": 6
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "kind": "Token",
+        "span": {
+          "start": 23,
+          "end": 31
+        },
+        "children": []
+      },
+      {
+        "id": 8,
+        "kind": "Annotation",
+        "span": {
+          "start": 33,
+          "end": 46
+        },
+        "children": [
+          {
+            "role": "token",
+            "nodeId": 9
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "kind": "Token",
+        "span": {
+          "start": 35,
+          "end": 46
+        },
+        "children": []
+      },
+      {
+        "id": 12,
+        "kind": "Block",
+        "span": {
+          "start": 47,
+          "end": 60
+        },
+        "children": [
+          {
+            "role": "statement",
+            "nodeId": 11
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "kind": "ReturnStatement",
+        "span": {
+          "start": 49,
+          "end": 57
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 10
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "kind": "Identifier",
+        "span": {
+          "start": 56,
+          "end": 57
+        },
+        "children": []
+      },
+      {
+        "id": 44,
+        "kind": "TechniqueDeclaration",
+        "span": {
+          "start": 64,
+          "end": 228
+        },
+        "children": [
+          {
+            "role": "identifier",
+            "nodeId": 14
+          },
+          {
+            "role": "body",
+            "nodeId": 43
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "kind": "Identifier",
+        "span": {
+          "start": 74,
+          "end": 80
+        },
+        "children": []
+      },
+      {
+        "id": 43,
+        "kind": "TechniqueBody",
+        "span": {
+          "start": 81,
+          "end": 228
+        },
+        "children": [
+          {
+            "role": "pass",
+            "nodeId": 42
+          }
+        ]
+      },
+      {
+        "id": 42,
+        "kind": "PassDeclaration",
+        "span": {
+          "start": 88,
+          "end": 225
+        },
+        "children": [
+          {
+            "role": "identifier",
+            "nodeId": 15
+          },
+          {
+            "role": "body",
+            "nodeId": 41
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "kind": "Identifier",
+        "span": {
+          "start": 93,
+          "end": 98
+        },
+        "children": []
+      },
+      {
+        "id": 41,
+        "kind": "Block",
+        "span": {
+          "start": 99,
+          "end": 225
+        },
+        "children": [
+          {
+            "role": "statement",
+            "nodeId": 20
+          },
+          {
+            "role": "statement",
+            "nodeId": 22
+          },
+          {
+            "role": "statement",
+            "nodeId": 25
+          },
+          {
+            "role": "statement",
+            "nodeId": 30
+          },
+          {
+            "role": "statement",
+            "nodeId": 32
+          },
+          {
+            "role": "statement",
+            "nodeId": 35
+          },
+          {
+            "role": "statement",
+            "nodeId": 40
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 110,
+          "end": 132
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 18
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "kind": "BinaryExpression",
+        "span": {
+          "start": 110,
+          "end": 132
+        },
+        "children": [
+          {
+            "role": "left",
+            "nodeId": 16
+          },
+          {
+            "role": "operator",
+            "nodeId": 19
+          },
+          {
+            "role": "right",
+            "nodeId": 17
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "kind": "Identifier",
+        "span": {
+          "start": 110,
+          "end": 122
+        },
+        "children": []
+      },
+      {
+        "id": 19,
+        "kind": "Operator",
+        "span": {
+          "start": 123,
+          "end": 124
+        },
+        "children": []
+      },
+      {
+        "id": 17,
+        "kind": "Identifier",
+        "span": {
+          "start": 125,
+          "end": 132
+        },
+        "children": []
+      },
+      {
+        "id": 22,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 133,
+          "end": 139
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 21
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "kind": "Identifier",
+        "span": {
+          "start": 133,
+          "end": 139
+        },
+        "children": []
+      },
+      {
+        "id": 25,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 140,
+          "end": 147
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 24
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "kind": "CallExpression",
+        "span": {
+          "start": 140,
+          "end": 147
+        },
+        "children": [
+          {
+            "role": "callee",
+            "nodeId": 23
+          }
+        ]
+      },
+      {
+        "id": 23,
+        "kind": "Identifier",
+        "span": {
+          "start": 140,
+          "end": 144
+        },
+        "children": []
+      },
+      {
+        "id": 30,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 157,
+          "end": 178
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 28
+          }
+        ]
+      },
+      {
+        "id": 28,
+        "kind": "BinaryExpression",
+        "span": {
+          "start": 157,
+          "end": 178
+        },
+        "children": [
+          {
+            "role": "left",
+            "nodeId": 26
+          },
+          {
+            "role": "operator",
+            "nodeId": 29
+          },
+          {
+            "role": "right",
+            "nodeId": 27
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "kind": "Identifier",
+        "span": {
+          "start": 157,
+          "end": 168
+        },
+        "children": []
+      },
+      {
+        "id": 29,
+        "kind": "Operator",
+        "span": {
+          "start": 169,
+          "end": 170
+        },
+        "children": []
+      },
+      {
+        "id": 27,
+        "kind": "Identifier",
+        "span": {
+          "start": 171,
+          "end": 178
+        },
+        "children": []
+      },
+      {
+        "id": 32,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 179,
+          "end": 185
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 31
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "kind": "Identifier",
+        "span": {
+          "start": 179,
+          "end": 185
+        },
+        "children": []
+      },
+      {
+        "id": 35,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 186,
+          "end": 193
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 34
+          }
+        ]
+      },
+      {
+        "id": 34,
+        "kind": "CallExpression",
+        "span": {
+          "start": 186,
+          "end": 193
+        },
+        "children": [
+          {
+            "role": "callee",
+            "nodeId": 33
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "kind": "Identifier",
+        "span": {
+          "start": 186,
+          "end": 190
+        },
+        "children": []
+      },
+      {
+        "id": 40,
+        "kind": "ExpressionStatement",
+        "span": {
+          "start": 203,
+          "end": 217
+        },
+        "children": [
+          {
+            "role": "expression",
+            "nodeId": 38
+          }
+        ]
+      },
+      {
+        "id": 38,
+        "kind": "BinaryExpression",
+        "span": {
+          "start": 203,
+          "end": 217
+        },
+        "children": [
+          {
+            "role": "left",
+            "nodeId": 36
+          },
+          {
+            "role": "operator",
+            "nodeId": 39
+          },
+          {
+            "role": "right",
+            "nodeId": 37
+          }
+        ]
+      },
+      {
+        "id": 36,
+        "kind": "Identifier",
+        "span": {
+          "start": 203,
+          "end": 210
+        },
+        "children": []
+      },
+      {
+        "id": 39,
+        "kind": "Operator",
+        "span": {
+          "start": 211,
+          "end": 212
+        },
+        "children": []
+      },
+      {
+        "id": 37,
+        "kind": "Identifier",
+        "span": {
+          "start": 213,
+          "end": 217
+        },
+        "children": []
+      }
+    ]
   },
   "symbols": [
     {

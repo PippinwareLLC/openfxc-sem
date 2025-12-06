@@ -3,7 +3,7 @@
 Technical reference for end users of the OpenFXC semantic analyzer.
 
 ## Purpose
-- Consume `openfxc-hlsl` AST JSON (SM1–SM5, FX syntax).
+- Consume `openfxc-hlsl` AST JSON (SM1-SM5, FX syntax).
 - Build a backend-agnostic semantic model: symbols, types, semantics, entry points, diagnostics.
 - Preserve partial results on errors; never crash on malformed input.
 
@@ -26,9 +26,9 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
 - CLI wrapper: `src/openfxc-sem/openfxc-sem.csproj`.
 
 ## Output schema (semantic JSON)
-- `formatVersion`: integer, currently `2`.
+- `formatVersion`: integer, currently `3`.
 - `profile`: selected profile string (e.g., `ps_4_0`).
-- `syntax`: `{ rootId }` referencing the AST root node id.
+- `syntax`: `{ rootId, nodes[] }` where `nodes` is a flattened list of `{ id, kind, span, children: [{ role, nodeId }] }` covering the parsed AST (statements/expressions/decls); spans are start/end offsets.
 - `symbols`: functions, parameters, locals, globals, structs, resources, cbuffers/tbuffers, structured/RW buffers; includes semantics and parent links.
 - `types`: normalized types per node id (scalars, vectors, matrices, arrays, resources, functions).
 - `entryPoints`: resolved entry with stage derived from profile and symbol id.
@@ -47,7 +47,7 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
   - SM4/5: SV_* validated per stage (e.g., VS return SV_Position; PS return SV_Target/Depth/Coverage; PS params may use SV_Position/SV_PrimitiveID/SV_SampleIndex/IsFrontFace/RTArrayIndex).
 - **Entry points**: resolved by name (or fallback with diagnostic), stage inferred from profile.
 - **FX stance**: techniques/passes are parsed into `techniques[]` (bindings + states). Diagnostics cover missing VS/PS bindings, duplicate technique/pass names, and profile/stage mismatches on bindings.
-- **Profiles**: SM1–SM5 supported; stage derived from profile prefix (vs/ps/gs/hs/ds/cs). Profile info is carried through symbols/types/entryPoints.
+- **Profiles**: SM1-SM5 supported; stage derived from profile prefix (vs/ps/gs/hs/ds/cs). Profile info is carried through symbols/types/entryPoints.
 - **Diagnostics** (IDs stable):
   - HLSL100x: duplicates (e.g., duplicate function).
   - HLSL2001: invalid call/constructor/intrinsic.

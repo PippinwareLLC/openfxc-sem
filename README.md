@@ -44,7 +44,7 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
 - Public entry point: `var analyzer = new SemanticAnalyzer(profile: "vs_3_0", entry: "main", inputJson); var output = analyzer.Analyze();`
 - Input JSON should come from `openfxc-hlsl` (do not synthesize ASTs manually). You can call the parser API directly and pass the serialized AST string to the analyzer without writing to disk.
 - CLI wrapper (`src/openfxc-sem/openfxc-sem.csproj`) references the core library and just handles argument parsing and I/O.
-- Output `formatVersion`: `2` (includes `techniques` list for FX files).
+- Output `formatVersion`: `3` (includes `techniques` list for FX files and a flattened syntax node table for lowering).
 
 ## Build
 - Prereq: initialize the parser submodule: `git submodule update --init --recursive`
@@ -60,7 +60,7 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
 
 ## Semantic Model (output)
 High-level shape of `output.sem.json`:
-- Metadata: `formatVersion`, selected `profile`, and a pointer back to the syntax root.
+- Metadata: `formatVersion`, selected `profile`, and syntax info (`rootId` plus flattened `nodes` with kind/children/spans for lowering).
 - Symbols: functions, parameters, locals, globals, structs/typedefs, samplers/resources, and cbuffers/tbuffers (SM4/5).
 - Types: assigned to every declaration and expression.
 - Entry points: resolved function, stage inferred from profile, entry metadata.

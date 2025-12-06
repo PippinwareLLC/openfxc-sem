@@ -22,6 +22,7 @@ public sealed class SemanticAnalyzer
     public SemanticOutput Analyze()
     {
         int? rootId = null;
+        NodeInfo? rootNode = null;
         List<SymbolInfo> symbols = new();
         List<TypeInfo> types = new();
         List<DiagnosticInfo> diagnostics = new();
@@ -37,7 +38,7 @@ public sealed class SemanticAnalyzer
             _typeInference.SetDocumentLength(tokens.DocumentLength);
             if (root.TryGetProperty("root", out var rootNodeEl))
             {
-                var rootNode = NodeInfo.FromJson(rootNodeEl);
+                rootNode = NodeInfo.FromJson(rootNodeEl);
                 var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                 ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
                 entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference, build.Spans);
@@ -58,9 +59,15 @@ public sealed class SemanticAnalyzer
 
         return new SemanticOutput
         {
-            FormatVersion = 2,
+            FormatVersion = 3,
             Profile = _profile,
-            Syntax = rootId is null ? null : new SyntaxInfo { RootId = rootId.Value },
+            Syntax = rootNode is null || rootId is null
+                ? null
+                : new SyntaxInfo
+                {
+                    RootId = rootId.Value,
+                    Nodes = BuildSyntaxNodes(rootNode)
+                },
             Symbols = symbols,
             Types = types,
             EntryPoints = entryPoints,
@@ -69,20 +76,51 @@ public sealed class SemanticAnalyzer
         };
     }
 
-        private static int? TryGetRootId(JsonElement root)
+    private static int? TryGetRootId(JsonElement root)
+    {
+        if (root.TryGetProperty("root", out var rootElement))
         {
-            if (root.TryGetProperty("root", out var rootElement))
-            {
-                if (rootElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var id))
+            if (rootElement.TryGetProperty("id", out var idElement) && idElement.TryGetInt32(out var id))
             {
                 return id;
             }
-            }
-
-            return null;
         }
 
+        return null;
     }
+
+    private static IReadOnlyList<SyntaxNodeInfo> BuildSyntaxNodes(NodeInfo root)
+    {
+        var nodes = new List<SyntaxNodeInfo>();
+
+        void Traverse(NodeInfo node)
+        {
+            var children = node.Children
+                .Select(c => new SyntaxNodeChild
+                {
+                    Role = c.Role,
+                    NodeId = c.Node.Id
+                })
+                .ToList();
+
+            nodes.Add(new SyntaxNodeInfo
+            {
+                Id = node.Id,
+                Kind = node.Kind ?? string.Empty,
+                Span = node.Span is null ? null : new SyntaxSpan { Start = node.Span.Value.Start, End = node.Span.Value.End },
+                Children = children
+            });
+
+            foreach (var child in node.Children)
+            {
+                Traverse(child.Node);
+            }
+        }
+
+        Traverse(root);
+        return nodes;
+    }
+}
 
 internal static class FxModelBuilder
 {
@@ -2343,6 +2381,42 @@ public sealed record SyntaxInfo
 {
     [JsonPropertyName("rootId")]
     public int RootId { get; init; }
+
+    [JsonPropertyName("nodes")]
+    public IReadOnlyList<SyntaxNodeInfo> Nodes { get; init; } = Array.Empty<SyntaxNodeInfo>();
+}
+
+public sealed record SyntaxNodeInfo
+{
+    [JsonPropertyName("id")]
+    public int? Id { get; init; }
+
+    [JsonPropertyName("kind")]
+    public string Kind { get; init; } = string.Empty;
+
+    [JsonPropertyName("span")]
+    public SyntaxSpan? Span { get; init; }
+
+    [JsonPropertyName("children")]
+    public IReadOnlyList<SyntaxNodeChild> Children { get; init; } = Array.Empty<SyntaxNodeChild>();
+}
+
+public sealed record SyntaxNodeChild
+{
+    [JsonPropertyName("role")]
+    public string Role { get; init; } = string.Empty;
+
+    [JsonPropertyName("nodeId")]
+    public int? NodeId { get; init; }
+}
+
+public sealed record SyntaxSpan
+{
+    [JsonPropertyName("start")]
+    public int Start { get; init; }
+
+    [JsonPropertyName("end")]
+    public int End { get; init; }
 }
 
 public sealed record EntryPointInfo
