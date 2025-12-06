@@ -55,21 +55,7 @@ public class SnapshotTests
 
     private static string RunParseThenAnalyze(string hlslPath, string profile)
     {
-        var parsePsi = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"run --no-build --project \"{RepoPath("openfxc-hlsl", "src", "openfxc-hlsl", "openfxc-hlsl.csproj")}\" parse -i \"{hlslPath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var parseProc = Process.Start(parsePsi) ?? throw new InvalidOperationException("Failed to start openfxc-hlsl parse.");
-        var astJson = parseProc.StandardOutput.ReadToEnd();
-        var parseErr = parseProc.StandardError.ReadToEnd();
-        parseProc.WaitForExit();
-        Assert.True(parseProc.ExitCode == 0, $"openfxc-hlsl parse failed with {parseProc.ExitCode}. stderr: {parseErr}");
+        var astJson = ParseHelper.BuildAstJsonFromPath(hlslPath);
 
         var semPsi = new ProcessStartInfo
         {

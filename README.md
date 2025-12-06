@@ -28,6 +28,17 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
   ```
 - AST inputs are produced by the `openfxc-hlsl` submodule (see `openfxc-hlsl/`), keeping parsing and semantics decoupled.
 
+## Parser (openfxc-hlsl) usage
+- Core library: `openfxc-hlsl/src/OpenFXC.Hlsl/OpenFXC.Hlsl.csproj` produces `OpenFXC.Hlsl.dll` with `HlslLexer` and `Parser`.
+- CLI wrapper: `openfxc-hlsl/src/openfxc-hlsl/openfxc-hlsl.csproj` references the library; use it for `lex`/`parse` commands.
+- Example (C#):
+  ```csharp
+  var text = File.ReadAllText("shader.hlsl");
+  var (tokens, lexDiagnostics) = HlslLexer.Lex(text);
+  var (root, parseDiagnostics) = Parser.Parse(tokens, text.Length);
+  ```
+  Reference the project directly or the built DLL to consume the lexer/parser from other tools.
+
 ## Build
 - Prereq: initialize the parser submodule: `git submodule update --init --recursive`
 - Build (Debug): `dotnet build src/openfxc-sem/openfxc-sem.csproj`
