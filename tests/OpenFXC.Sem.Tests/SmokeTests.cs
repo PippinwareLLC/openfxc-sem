@@ -83,6 +83,7 @@ public class SmokeTests
 
         Assert.True(types.Count > symbols.Count, "Expected more type entries than symbols (expression typing present).");
         Assert.Contains(types, t => (t.GetProperty("type").GetString() ?? string.Empty).Contains("float4"));
+        Assert.Contains(types, t => (t.GetProperty("type").GetString() ?? string.Empty).Contains("float4x4"));
     }
 
     [Theory]

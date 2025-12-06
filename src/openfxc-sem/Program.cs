@@ -674,7 +674,7 @@ internal static class Program
             return trimmed;
         }
 
-        public string NormalizeFunctionType(string returnType, IReadOnlyList<string> parameters)
+        public string NormalizeFunctionType(string? returnType, IReadOnlyList<string?> parameters)
         {
             var normalizedReturn = NormalizeType(returnType) ?? "void";
             var normalizedParams = parameters.Select(p => NormalizeType(p) ?? "void");
@@ -705,6 +705,8 @@ internal static class Program
 
     private static class ExpressionTypeAnalyzer
     {
+        private static readonly HashSet<string> ScalarTypes = new(StringComparer.OrdinalIgnoreCase) { "float", "int", "bool", "half", "double" };
+
         public static void Infer(NodeInfo root, TokenLookup tokens, List<SymbolInfo> symbols, List<TypeInfo> types, TypeInference typeInference)
         {
             var symbolTypes = symbols
@@ -732,44 +734,8 @@ internal static class Program
                             }
                         }
                         break;
-                    case "CallExpression":
-                        {
-                            var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
-                            var calleeName = callee is null ? null : tokens.GetText(callee.Span);
-                            var arguments = node.Children.Where(c => string.Equals(c.Role, "argument", StringComparison.OrdinalIgnoreCase)).Select(c => c.Node).ToList();
-                            var argTypes = arguments.Select(a => typeInference.GetNodeType(a.Id)).ToList();
-
-                            string? inferred = null;
-                            if (!string.IsNullOrWhiteSpace(calleeName))
-                            {
-                                if (IsTypeName(calleeName!))
-                                {
-                                    inferred = calleeName;
-                                }
-                                else if (symbolTypes.TryGetValue(calleeName!, out var fnType))
-                                {
-                                    inferred = ExtractReturnType(fnType);
-                                }
-                                else if (string.Equals(calleeName, "mul", StringComparison.OrdinalIgnoreCase) && argTypes.Count >= 1)
-                                {
-                                    inferred = argTypes.Last() ?? argTypes.First();
-                                }
-                            }
-
-                            AddType(types, typeInference, node.Id, inferred);
-                        }
-                        break;
-                    case "BinaryExpression":
-                        {
-                            var left = node.Children.FirstOrDefault(c => string.Equals(c.Role, "left", StringComparison.OrdinalIgnoreCase)).Node;
-                            var right = node.Children.FirstOrDefault(c => string.Equals(c.Role, "right", StringComparison.OrdinalIgnoreCase)).Node;
-                            var lt = typeInference.GetNodeType(left?.Id);
-                            var rt = typeInference.GetNodeType(right?.Id);
-                            if (!string.IsNullOrWhiteSpace(lt) && string.Equals(lt, rt, StringComparison.OrdinalIgnoreCase))
-                            {
-                                AddType(types, typeInference, node.Id, lt);
-                            }
-                        }
+                    case "Literal":
+                        AddType(types, typeInference, node.Id, InferLiteralType(tokens.GetText(node.Span)));
                         break;
                     case "MemberAccessExpression":
                         {
@@ -781,10 +747,87 @@ internal static class Program
                             AddType(types, typeInference, node.Id, inferred);
                         }
                         break;
+                    case "CallExpression":
+                        InferCall(node, tokens, symbolTypes, typeInference, types);
+                        break;
+                    case "BinaryExpression":
+                        InferBinary(node, tokens, typeInference, types);
+                        break;
+                    case "CastExpression":
+                        {
+                            var typeNode = node.Children.FirstOrDefault(c => string.Equals(c.Role, "type", StringComparison.OrdinalIgnoreCase)).Node;
+                            var targetType = typeNode is null ? null : tokens.GetText(typeNode.Span);
+                            AddType(types, typeInference, node.Id, targetType);
+                        }
+                        break;
+                    case "IndexExpression":
+                        {
+                            var target = node.Children.FirstOrDefault(c => string.Equals(c.Role, "expression", StringComparison.OrdinalIgnoreCase)).Node;
+                            var baseType = typeInference.GetNodeType(target?.Id);
+                            var elementType = InferIndexedType(baseType);
+                            AddType(types, typeInference, node.Id, elementType);
+                        }
+                        break;
                     default:
                         break;
                 }
             }
+        }
+
+        private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, string> symbolTypes, TypeInference typeInference, List<TypeInfo> types)
+        {
+            var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
+            var calleeName = callee is null ? null : tokens.GetText(callee.Span);
+            var arguments = node.Children.Where(c => string.Equals(c.Role, "argument", StringComparison.OrdinalIgnoreCase)).Select(c => c.Node).ToList();
+            var argTypes = arguments.Select(a => typeInference.GetNodeType(a.Id)).ToList();
+
+            string? inferred = null;
+            if (!string.IsNullOrWhiteSpace(calleeName))
+            {
+                if (IsTypeName(calleeName!))
+                {
+                    inferred = calleeName;
+                }
+                else if (symbolTypes.TryGetValue(calleeName!, out var fnType))
+                {
+                    inferred = ExtractReturnType(fnType);
+                }
+                else if (string.Equals(calleeName, "mul", StringComparison.OrdinalIgnoreCase) && argTypes.Count >= 1)
+                {
+                    inferred = argTypes.Last() ?? argTypes.First();
+                }
+            }
+
+            AddType(types, typeInference, node.Id, inferred);
+        }
+
+        private static void InferBinary(NodeInfo node, TokenLookup tokens, TypeInference typeInference, List<TypeInfo> types)
+        {
+            var left = node.Children.FirstOrDefault(c => string.Equals(c.Role, "left", StringComparison.OrdinalIgnoreCase)).Node;
+            var right = node.Children.FirstOrDefault(c => string.Equals(c.Role, "right", StringComparison.OrdinalIgnoreCase)).Node;
+            var lt = typeInference.GetNodeType(left?.Id);
+            var rt = typeInference.GetNodeType(right?.Id);
+
+            var merged = MergeBinaryTypes(lt, rt);
+            AddType(types, typeInference, node.Id, merged);
+        }
+
+        private static string? InferIndexedType(string? baseType)
+        {
+            if (string.IsNullOrWhiteSpace(baseType)) return null;
+            if (IsVector(baseType))
+            {
+                return baseType.TrimEnd('2', '3', '4', 'x', 'X', 'y', 'Y', 'z', 'Z', 'w', 'W', 'r', 'g', 'b', 'a');
+            }
+            if (IsMatrix(baseType))
+            {
+                var parts = baseType.Split('x', 'X');
+                if (parts.Length == 2 && int.TryParse(parts[1], out var cols))
+                {
+                    return $"{parts[0]}{cols}";
+                }
+            }
+            return baseType;
         }
 
         private static void AddType(List<TypeInfo> types, TypeInference typeInference, int? nodeId, string? type)
@@ -809,12 +852,9 @@ internal static class Program
 
         private static bool IsTypeName(string name)
         {
-            return name.StartsWith("float", StringComparison.OrdinalIgnoreCase)
-                   || name.StartsWith("int", StringComparison.OrdinalIgnoreCase)
-                   || name.StartsWith("bool", StringComparison.OrdinalIgnoreCase)
-                   || name.StartsWith("matrix", StringComparison.OrdinalIgnoreCase)
-                   || name.StartsWith("half", StringComparison.OrdinalIgnoreCase)
-                   || name.StartsWith("double", StringComparison.OrdinalIgnoreCase);
+            return ScalarTypes.Contains(name)
+                   || IsVector(name)
+                   || IsMatrix(name);
         }
 
         private static string? ExtractReturnType(string fnType)
@@ -839,6 +879,56 @@ internal static class Program
             var scalar = baseType.TrimEnd('1', '2', '3', '4');
             return count == 1 ? scalar : $"{scalar}{count}";
         }
+
+        private static string? InferLiteralType(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            var span = text.Trim();
+            if (span.Contains(".") || span.IndexOfAny(new[] { 'e', 'E' }) >= 0 || span.EndsWith("f", StringComparison.OrdinalIgnoreCase))
+            {
+                return "float";
+            }
+
+            if (span.StartsWith("true", StringComparison.OrdinalIgnoreCase) || span.StartsWith("false", StringComparison.OrdinalIgnoreCase))
+            {
+                return "bool";
+            }
+
+            return "int";
+        }
+
+        private static string? MergeBinaryTypes(string? left, string? right)
+        {
+            if (string.IsNullOrWhiteSpace(left)) return right;
+            if (string.IsNullOrWhiteSpace(right)) return left;
+            if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase)) return left;
+
+            if (IsVectorOrMatrix(left) && IsVectorOrMatrix(right))
+            {
+                return left.Length >= right.Length ? left : right;
+            }
+
+            if (IsVectorOrMatrix(left)) return left;
+            if (IsVectorOrMatrix(right)) return right;
+            if (ScalarTypes.Contains(left)) return left;
+            if (ScalarTypes.Contains(right)) return right;
+
+            return left;
+        }
+
+        private static bool IsVectorOrMatrix(string type) => IsVector(type) || IsMatrix(type);
+
+        private static bool IsVector(string type)
+        {
+            return type.StartsWith("float", StringComparison.OrdinalIgnoreCase) && type.Length > "float".Length
+                || type.StartsWith("int", StringComparison.OrdinalIgnoreCase) && type.Length > "int".Length;
+        }
+
+        private static bool IsMatrix(string type) => type.IndexOf('x') >= 0 || type.IndexOf('X') >= 0;
     }
 
     private sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChild> Children)
