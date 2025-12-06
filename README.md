@@ -68,8 +68,8 @@ High-level shape of `output.sem.json`:
 
 ## Testing (commands)
 - Run all tests: `dotnet test tests/OpenFXC.Sem.Tests/OpenFXC.Sem.Tests.csproj`
-- Convenience: `tests/run-all.cmd` (Windows) or `tests/run-all.sh` (bash)
-- Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests). The suite is scaffolded; expand alongside semantic features per `docs/TDD.md`.
+- Convenience: `tests/run-all.cmd` (Windows) or `tests/run-all.sh` (bash) — respects `OPENFXC_SEM_FX_SWEEP=all` for DXSDK sweep.
+- Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests).
 - Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
 - Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
 

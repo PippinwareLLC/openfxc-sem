@@ -30,7 +30,7 @@
   - Semantic JSON snapshots for representative shaders (SM2 passthrough VS, SM2 texture PS, SM4 cbuffer VS) committed.
   - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1-SM5 using this repo's `samples/` as sources; env-gated DXSDK full sweep.
   - CLI smoke for stdin/file IO (snapshot tests) with baselines kept in repo.
-- [ ] **M8: Tooling and CI**
+- [x] **M8: Tooling and CI**
   - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites and DXSDK sweep toggle.
   - Docs/README/compatibility matrix kept in sync; devlogs recorded; release checklist established.
 - [ ] **M9: Release Readiness (Semantic Parity)**

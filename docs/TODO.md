@@ -48,6 +48,7 @@
 - [ ] Compatibility matrix kept in sync with snapshot coverage and SM-era feature completion.
 
 ## Tooling and CI
-- [ ] Test runner scripts (tests/run-all.* ) covering unit, negative, snapshot, and CLI smoke suites.
-- [ ] Update README and docs as surfaces evolve; keep TODO/MILESTONES in sync with progress.
-- [ ] Add devlog entries for significant changes and test runs.
+- [x] Test runner scripts (tests/run-all.* ) covering unit, negative, snapshot, and CLI smoke suites (DXSDK sweep gated via env).
+- [x] Update README and docs as surfaces evolve; keep TODO/MILESTONES in sync with progress.
+- [x] Add devlog entries for significant changes and test runs.
+- [x] Release checklist added (`docs/RELEASE_CHECKLIST.md`).
