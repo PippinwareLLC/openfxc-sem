@@ -8,7 +8,7 @@
 ## Symbol Table
 - [x] Collect symbols for globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
 - [x] Capture parent/child relationships (e.g., parameters under functions) and declaration node links.
-- [ ] Tests: symbol presence for each category across SM1–SM5.
+- [ ] Tests: symbol presence for each category across SM1-SM5.
 
 ## Type System
 - [x] Type construction for scalars, vectors, matrices, arrays, resource types, and function signatures (structured SemType).
@@ -22,10 +22,10 @@
 - [ ] Extend coverage to more intrinsics and texture variants (SM3+/SM4+).
 
 ## Semantics and Entry Points
-- [ ] Normalize legacy semantics (POSITION0, COLOR0) and SV_* forms; associate indices where present, validate against stage/profile.
+- [ ] Normalize legacy semantics (POSITION0, COLOR0) and SV_* forms; associate indices where present, validate against stage/profile. (Basic uppercasing and SM4 system-value guards done; broaden validation/index handling.)
 - [x] Bind parameter/return semantics and record in symbols/types; uppercase normalization applied.
 - [x] Entry resolution: default main or --entry, stage derived from profile (with diagnostic when missing).
-- [ ] Tests: parameter/return semantics validation, SV targets, entry selection/ambiguity, missing/invalid semantics diagnostics.
+- [ ] Tests: parameter/return semantics validation, SV targets, entry selection/ambiguity, missing/invalid semantics diagnostics. (Initial coverage for normalization, missing/duplicate semantics, missing entry; expand stage/profile cases.)
 
 ## Profile Awareness
 - [x] Carry profile metadata through analysis for entry-point stage mapping.
@@ -39,11 +39,11 @@
 
 ## Integration and Snapshots
 - [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
-- [ ] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1–SM5 (DXSDK sweep gated).
+- [ ] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated).
 - [ ] CLI smoke tests for stdin/file IO and required options (--profile, --entry).
 - [ ] Source fixtures from samples/ in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
 
 ## Tooling and CI
-- [ ] Test runner scripts (tests/run-all.*) covering unit, negative, snapshot, and CLI smoke suites.
+- [ ] Test runner scripts (tests/run-all.* ) covering unit, negative, snapshot, and CLI smoke suites.
 - [ ] Update README and docs as surfaces evolve; keep TODO/MILESTONES in sync with progress.
 - [ ] Add devlog entries for significant changes and test runs.

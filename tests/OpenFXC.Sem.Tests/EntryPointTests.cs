@@ -17,6 +17,8 @@ float4 VSMain(float4 p : POSITION0) : SV_Position { return p; }";
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
         var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3001");
+        var entries = doc.RootElement.GetProperty("entryPoints").EnumerateArray().ToList();
+        Assert.NotEmpty(entries);
     }
 
     [Fact]
@@ -54,6 +56,28 @@ float4 main(float4 pos : POSITION0) : SV_Target { return pos; }";
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
         var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Fact]
+    public void Duplicate_semantics_on_entry_parameters_reported()
+    {
+        var source = @"
+float4 main(float4 a : POSITION0, float4 b : POSITION0) : SV_Position { return a + b; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3003");
+    }
+
+    [Fact]
+    public void Missing_semantics_on_entry_param_reported()
+    {
+        var source = @"
+float4 main(float4 a, float4 b : POSITION0) : SV_Position { return a + b; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3004");
     }
 
     private static string RunParseThenAnalyzeSource(string source, string profile)

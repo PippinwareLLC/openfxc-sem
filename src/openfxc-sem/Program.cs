@@ -1605,9 +1605,27 @@ internal static class Program
                 ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference);
             }
 
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var param in symbols.Where(s => s.ParentSymbolId == entry.SymbolId && string.Equals(s.Kind, "Parameter", StringComparison.OrdinalIgnoreCase)))
             {
                 ValidateParameterSemantic(param, stage, smMajor, inference);
+                var key = SemanticKey(param.Semantic);
+                if (!string.IsNullOrEmpty(key))
+                {
+                    if (!seen.Add(key))
+                    {
+                        inference.AddDiagnostic("HLSL3003", $"Duplicate semantic '{key}' on entry parameters.");
+                    }
+                }
+                else
+                {
+                    inference.AddDiagnostic("HLSL3004", "Entry parameter missing semantic.");
+                }
+            }
+
+            if (function is not null && function.ReturnSemantic is null)
+            {
+                inference.AddDiagnostic("HLSL3004", "Entry return value missing semantic.");
             }
         }
 
@@ -1641,6 +1659,12 @@ internal static class Program
         }
 
         private static bool IsSystemValue(string name) => name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase);
+
+        private static string SemanticKey(SemanticInfo? semantic)
+        {
+            if (semantic is null) return string.Empty;
+            return $"{semantic.Name}:{semantic.Index ?? 0}";
+        }
 
         private static int ParseProfileMajor(string profile)
         {

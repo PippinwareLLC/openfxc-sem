@@ -16,10 +16,10 @@
   - Intrinsic catalog (initial set: mul/dot/normalize/saturate/tex2D) with deterministic signatures.
   - Arity/type checking with diagnostics on misuse (HLSL2001 for bad overload/arity).
   - Intrinsic-focused unit and negative tests added.
-- [ ] **M4: Semantics and Entry Points**
-  - Normalize legacy and `SV_*` semantics; bind to params/returns and symbols.
-  - Entry-point resolution (default and `--entry`), stage derived from profile.
-  - Tests for semantics binding and entry selection/missing-entry diagnostics.
+- [x] **M4: Semantics and Entry Points**
+  - Normalize legacy and `SV_*` semantics; bind to params/returns and symbols; diagnostics for invalid/missing.
+  - Entry-point resolution (default and `--entry`), stage derived from profile with missing-entry diagnostics.
+  - Tests for semantics binding, normalization, duplicates, missing semantics, and entry selection diagnostics.
 - [ ] **M5: Profile Awareness**
   - Profile metadata propagated; optional guardrails for incompatible semantics/usages.
   - Tests for profile propagation and any enforced rules.
