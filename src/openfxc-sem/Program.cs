@@ -154,7 +154,7 @@ internal static class Program
                 if (root.TryGetProperty("root", out var rootNodeEl))
                 {
                     var rootNode = NodeInfo.FromJson(rootNodeEl);
-                    var build = SymbolBuilder.Build(root, _typeInference);
+                    var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                     ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
                     symbols = build.Symbols;
                     types = build.Types;
@@ -195,15 +195,8 @@ internal static class Program
 
     private static class SymbolBuilder
     {
-        public static SymbolBuildResult Build(JsonElement root, TypeInference typeInference)
+        public static SymbolBuildResult Build(NodeInfo rootNode, TokenLookup tokens, TypeInference typeInference)
         {
-            if (!root.TryGetProperty("root", out var rootNodeEl))
-            {
-                return new SymbolBuildResult(new List<SymbolInfo>(), new List<TypeInfo>());
-            }
-
-            var tokens = TokenLookup.From(root);
-            var rootNode = NodeInfo.FromJson(rootNodeEl);
             var symbols = new List<SymbolInfo>();
             var typeCollector = new TypeCollector();
             Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, typeCollector, tokens, typeInference);
@@ -677,7 +670,8 @@ internal static class Program
                 return null;
             }
 
-            return type.Trim();
+            var trimmed = type.Trim();
+            return trimmed;
         }
 
         public string NormalizeFunctionType(string returnType, IReadOnlyList<string> parameters)

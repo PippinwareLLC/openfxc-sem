@@ -71,6 +71,20 @@ public class SmokeTests
             && s.GetProperty("name").GetString() == "Texture0");
     }
 
+    [Fact]
+    public void Analyze_infers_types_beyond_symbols_on_small_sample()
+    {
+        var semJson = RunParseThenAnalyze(@"samples/sm2/vs_passthrough/main.hlsl", profile: "vs_2_0");
+
+        using var doc = JsonDocument.Parse(semJson);
+        var root = doc.RootElement;
+        var symbols = root.GetProperty("symbols").EnumerateArray().ToList();
+        var types = root.GetProperty("types").EnumerateArray().ToList();
+
+        Assert.True(types.Count > symbols.Count, "Expected more type entries than symbols (expression typing present).");
+        Assert.Contains(types, t => (t.GetProperty("type").GetString() ?? string.Empty).Contains("float4"));
+    }
+
     [Theory]
     [MemberData(nameof(FxSamplePaths))]
     public void Analyze_parses_all_dx_sdk_fx_samples(string relativePath)
@@ -114,7 +128,7 @@ public class SmokeTests
         var parsePsi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{RepoPath("openfxc-hlsl", "src", "openfxc-hlsl", "openfxc-hlsl.csproj")}\" parse -i \"{hlslPath}\"",
+            Arguments = $"run --no-build --project \"{RepoPath("openfxc-hlsl", "src", "openfxc-hlsl", "openfxc-hlsl.csproj")}\" parse -i \"{hlslPath}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -133,7 +147,7 @@ public class SmokeTests
         var semPsi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{RepoPath("src", "openfxc-sem", "openfxc-sem.csproj")}\" analyze --profile {profile} --input \"{tempAstPath}\"",
+            Arguments = $"run --no-build --project \"{RepoPath("src", "openfxc-sem", "openfxc-sem.csproj")}\" analyze --profile {profile} --input \"{tempAstPath}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
