@@ -33,6 +33,14 @@
 - [x] **M8: Tooling and CI**
   - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites and DXSDK sweep toggle.
   - Docs/README/compatibility matrix kept in sync; devlogs recorded; release checklist established.
+- [x] **M8.1: SM4/SM5 Resource Semantics**
+  - Capture cbuffer/tbuffer symbols and members; add structured/RW resource types and semantics binding.
+  - Expand intrinsic/profile coverage for SM4/SM5-era builtins and resource overloads.
+  - Tests and snapshots for SM4/SM5 shaders (cbuffer, structured buffer, RW resources).
+- [ ] **M8.2: Snapshot and Sweep Hardening**
+  - Golden semantic snapshots across SM1-SM5 (positive and representative negative cases).
+  - Full DXSDK sweep (env-gated) kept green; snapshot regressions reviewed/locked; compatibility matrix updated.
+  - FX construct stance defined (supported vs diagnosed) with tests.
 - [ ] **M9: Release Readiness (Semantic Parity)**
   - Semantic coverage per `docs/TDD.md` across SM1-SM5, including SM4/5 cbuffer/tbuffer and structured/RW resources; no known crashers; stable outputs and diagnostics.
   - FX construct stance documented (supported or diagnosed); compatibility matrix locked; regression suite green.

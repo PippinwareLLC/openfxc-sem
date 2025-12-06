@@ -9,13 +9,13 @@
 - [x] Collect symbols for globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
 - [x] Capture parent/child relationships (e.g., parameters under functions) and declaration node links.
 - [ ] Tests: symbol presence for each category across SM1-SM5.
-- [ ] SM4/SM5 resource shapes: capture cbuffer/tbuffer contents and structured/RW resources with normalized types.
+- [x] SM4/SM5 resource shapes: capture cbuffer/tbuffer contents and structured/RW resources with normalized types.
 
 ## Type System
 - [x] Type construction for scalars, vectors, matrices, arrays, resource types, and function signatures (structured SemType).
 - [x] Expression inference for arithmetic, swizzles, indexing, calls, constructors, casts.
 - [x] Tests: positive and negative inference cases; mismatches flagged with diagnostics (constructor overfill, binary mismatch, array declarators).
-- [ ] SM4/SM5 type coverage for structured/RW resources and cbuffer/tbuffer members.
+- [x] SM4/SM5 type coverage for structured/RW resources and cbuffer/tbuffer members.
 
 ## Intrinsics and Builtins
 - [x] Implement intrinsic table (initial set: mul, dot, normalize, saturate, tex2D).

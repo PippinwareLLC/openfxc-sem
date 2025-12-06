@@ -227,6 +227,16 @@ internal static class Program
 
             switch (node.Kind)
             {
+                case "BufferDeclaration":
+                    {
+                        var cbufSym = BuildCBufferSymbol(node, tokens);
+                        if (cbufSym is not null)
+                        {
+                            symbols.Add(cbufSym);
+                            currentStructId = cbufSym.Id;
+                        }
+                    }
+                    break;
                 case "FunctionDeclaration":
                     HandleFunction(node, symbols, types, tokens, typeInference);
                     currentFunctionId = node.Id;
@@ -273,6 +283,21 @@ internal static class Program
                     break;
                 case "Type":
                     types.Add(node.Id, tokens.GetText(node.Span));
+                    break;
+                case "BufferBody":
+                    {
+                        foreach (var member in tokens.ExtractBufferMembers(node.Span))
+                        {
+                            symbols.Add(new SymbolInfo
+                            {
+                                Kind = "CBufferMember",
+                                Name = member.Name,
+                                Type = member.Type,
+                                ParentSymbolId = currentStructId,
+                                DeclNodeId = node.Id
+                            });
+                        }
+                    }
                     break;
                 default:
                     break;
@@ -425,7 +450,7 @@ internal static class Program
             {
                 return "Sampler";
             }
-            if (!string.IsNullOrWhiteSpace(type) && type.StartsWith("texture", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(type) && (type.StartsWith("texture", StringComparison.OrdinalIgnoreCase) || type.Contains("buffer", StringComparison.OrdinalIgnoreCase)))
             {
                 return "Resource";
             }
@@ -677,6 +702,42 @@ internal static class Program
             return null;
         }
 
+        public IReadOnlyList<(string Type, string Name)> ExtractBufferMembers(Span? span)
+        {
+            if (span is null) return Array.Empty<(string Type, string Name)>();
+            var slice = _tokens
+                .Where(t => t.Start >= span.Value.Start && t.End <= span.Value.End)
+                .OrderBy(t => t.Start)
+                .ToList();
+
+            var members = new List<(string Type, string Name)>();
+            var current = new List<TokenInfo>();
+            foreach (var token in slice)
+            {
+                if (token.Text == ";")
+                {
+                    AddMember(current, members);
+                    current.Clear();
+                }
+                else
+                {
+                    current.Add(token);
+                }
+            }
+            AddMember(current, members);
+            return members;
+        }
+
+        private static void AddMember(List<TokenInfo> tokens, List<(string Type, string Name)> members)
+        {
+            if (tokens.Count == 0) return;
+            var filtered = tokens.Where(t => !IsDelimiter(t.Text) && !string.Equals(t.Text, "register", StringComparison.OrdinalIgnoreCase)).ToList();
+            if (filtered.Count < 2) return;
+            var type = filtered[0].Text;
+            var name = filtered[1].Text;
+            members.Add((type, name));
+        }
+
         internal static bool IsModifier(string text)
         {
             return string.Equals(text, "in", StringComparison.OrdinalIgnoreCase)
@@ -686,7 +747,7 @@ internal static class Program
 
         private static bool IsDelimiter(string text)
         {
-            return text is ":" or "," or ")" or "(";
+            return text is ":" or "," or ")" or "(" or "{" or "}";
         }
 
         internal static bool TryGetSpan(JsonElement element, out Span span)
