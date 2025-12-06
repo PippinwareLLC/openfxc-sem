@@ -165,7 +165,7 @@ Those belong to *profile legalization*.
 
 ---
 
-# 🏁 **5. Final answer**
+# 🏁 **5. Final decision**
 
 It should care ONLY about HLSL semantics and produce a backend-agnostic semantic model.
 
