@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "profile": "vs_4_0",
   "syntax": {
     "rootId": 35
@@ -157,6 +157,7 @@
       "profile": "vs_4_0"
     }
   ],
+  "techniques": [],
   "diagnostics": [
     {
       "severity": "Error",

@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "profile": "ps_2_0",
   "syntax": {
     "rootId": 14
@@ -63,6 +63,7 @@
       "profile": "ps_2_0"
     }
   ],
+  "techniques": [],
   "diagnostics": [
     {
       "severity": "Error",

@@ -26,12 +26,13 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
 - CLI wrapper: `src/openfxc-sem/openfxc-sem.csproj`.
 
 ## Output schema (semantic JSON)
-- `formatVersion`: integer, currently `1`.
+- `formatVersion`: integer, currently `2`.
 - `profile`: selected profile string (e.g., `ps_4_0`).
 - `syntax`: `{ rootId }` referencing the AST root node id.
 - `symbols`: functions, parameters, locals, globals, structs, resources, cbuffers/tbuffers, structured/RW buffers; includes semantics and parent links.
 - `types`: normalized types per node id (scalars, vectors, matrices, arrays, resources, functions).
 - `entryPoints`: resolved entry with stage derived from profile and symbol id.
+- `techniques`: FX metadata: techniques/passes, shader bindings per stage (entry/profile), and render-state assignments.
 - `diagnostics`: `severity/id/message/span` (span is start/end in source; clamped to document length).
 
 ## Responsibilities & Rules
@@ -45,7 +46,7 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
   - SM<4: SV_* blocked on params/returns (stage-aware); pixel returns must be COLOR/DEPTH; diagnostics HLSL3002/3003/3004 as applicable.
   - SM4/5: SV_* validated per stage (e.g., VS return SV_Position; PS return SV_Target/Depth/Coverage; PS params may use SV_Position/SV_PrimitiveID/SV_SampleIndex/IsFrontFace/RTArrayIndex).
 - **Entry points**: resolved by name (or fallback with diagnostic), stage inferred from profile.
-- **FX stance**: only shader entry analysis is supported; techniques/passes emit diagnostic HLSL5001 (not computed).
+- **FX stance**: techniques/passes are parsed into `techniques[]` (bindings + states). Diagnostics cover missing VS/PS bindings, duplicate technique/pass names, and profile/stage mismatches on bindings.
 - **Profiles**: SM1–SM5 supported; stage derived from profile prefix (vs/ps/gs/hs/ds/cs). Profile info is carried through symbols/types/entryPoints.
 - **Diagnostics** (IDs stable):
   - HLSL100x: duplicates (e.g., duplicate function).
@@ -54,11 +55,11 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
   - HLSL2005: unknown identifier.
   - HLSL3001: missing entry point.
   - HLSL3002/3003/3004: semantic/stage/profile issues (invalid/system-value/duplicate/missing).
-  - HLSL5001: FX techniques/passes unsupported.
+  - HLSL5001–HLSL5006: FX issues (missing technique name, duplicate technique/pass, missing VS/PS, stage/profile mismatch).
 
 ## Testing
 - Unit/negative/intrinsic/semantics/FX tests: `dotnet test tests/OpenFXC.Sem.Tests/OpenFXC.Sem.Tests.csproj`
-- Snapshots (semantic JSON): `tests/snapshots/*.sem.json` (SM2 VS/PS, SM4 cbuffer, SM5 structured, SM2 invalid SV case).
+- Snapshots (semantic JSON): `tests/snapshots/*.sem.json` (SM2 VS/PS, SM4 cbuffer, SM5 structured, SM2 invalid SV case, FX technique coverage).
 - DXSDK sweep (env-gated): `OPENFXC_SEM_FX_SWEEP=all dotnet test ...` to run all `samples/dxsdk/**/*.fx`; default runs only a single sample for speed.
 
 ## Notes

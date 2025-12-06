@@ -140,7 +140,7 @@ float4 main(float2 uv : SV_Position) : SV_Target { return float4(uv, 0, 1); }";
     }
 
     [Fact]
-    public void Fx_technique_emits_diagnostic()
+    public void Fx_technique_is_recorded()
     {
         var source = @"
 float4 main(float4 p : POSITION) : SV_Position { return p; }
@@ -148,12 +148,27 @@ float4 main(float4 p : POSITION) : SV_Position { return p; }
 technique T {
     pass P {
         VertexShader = compile vs_2_0 main();
+        PixelShader = compile ps_2_0 main();
+        ZEnable = TRUE;
     }
 };";
 
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
-        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
-        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL5001");
+        var techniques = doc.RootElement.GetProperty("techniques").EnumerateArray().ToList();
+
+        Assert.Single(techniques);
+        var technique = techniques[0];
+        Assert.Equal("T", technique.GetProperty("name").GetString());
+
+        var pass = technique.GetProperty("passes").EnumerateArray().Single();
+        Assert.Equal("P", pass.GetProperty("name").GetString());
+
+        var shaders = pass.GetProperty("shaders").EnumerateArray().ToList();
+        Assert.Contains(shaders, s => s.GetProperty("stage").GetString() == "Vertex" && s.GetProperty("entry").GetString() == "main" && s.GetProperty("profile").GetString() == "vs_2_0");
+        Assert.Contains(shaders, s => s.GetProperty("stage").GetString() == "Pixel" && s.GetProperty("entry").GetString() == "main" && s.GetProperty("profile").GetString() == "ps_2_0");
+
+        var states = pass.GetProperty("states").EnumerateArray().ToList();
+        Assert.Contains(states, s => s.GetProperty("name").GetString() == "ZEnable" && s.GetProperty("value").GetString() == "TRUE");
     }
 
     [Fact]

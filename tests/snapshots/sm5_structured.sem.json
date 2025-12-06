@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "profile": "cs_5_0",
   "syntax": {
     "rootId": 35
@@ -122,5 +122,6 @@
       "profile": "cs_5_0"
     }
   ],
+  "techniques": [],
   "diagnostics": []
 }

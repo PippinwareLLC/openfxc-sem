@@ -26,6 +26,7 @@ public sealed class SemanticAnalyzer
         List<TypeInfo> types = new();
         List<DiagnosticInfo> diagnostics = new();
         List<EntryPointInfo> entryPoints = new();
+        List<FxTechniqueInfo> techniques = new();
 
         try
         {
@@ -37,11 +38,11 @@ public sealed class SemanticAnalyzer
             if (root.TryGetProperty("root", out var rootNodeEl))
             {
                 var rootNode = NodeInfo.FromJson(rootNodeEl);
-                AddFxDiagnostics(rootNode, _typeInference);
                 var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                 ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
                 entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference, build.Spans);
                 SemanticValidator.Validate(build.Symbols, entryPoints, _profile, _typeInference, build.Spans);
+                techniques = FxModelBuilder.Build(rootNode, tokens, _typeInference, build.Symbols);
                 diagnostics.AddRange(_typeInference.Diagnostics);
                 symbols = build.Symbols;
                 types = build.Types;
@@ -57,12 +58,13 @@ public sealed class SemanticAnalyzer
 
         return new SemanticOutput
         {
-            FormatVersion = 1,
+            FormatVersion = 2,
             Profile = _profile,
             Syntax = rootId is null ? null : new SyntaxInfo { RootId = rootId.Value },
             Symbols = symbols,
             Types = types,
             EntryPoints = entryPoints,
+            Techniques = techniques,
             Diagnostics = diagnostics
         };
     }
@@ -80,24 +82,229 @@ public sealed class SemanticAnalyzer
             return null;
         }
 
-        private static void AddFxDiagnostics(NodeInfo rootNode, TypeInference inference)
-        {
-            void Traverse(NodeInfo node)
-            {
-                if (node.Kind is not null && (node.Kind.Contains("Technique", StringComparison.OrdinalIgnoreCase) || node.Kind.Contains("Pass", StringComparison.OrdinalIgnoreCase)))
-                {
-                    inference.AddDiagnostic("HLSL5001", "FX constructs (technique/pass) semantics are not supported; shader entry analysis only.", node.Span);
-                }
+    }
 
-                foreach (var child in node.Children)
+internal static class FxModelBuilder
+{
+    public static List<FxTechniqueInfo> Build(NodeInfo rootNode, TokenLookup tokens, TypeInference inference, List<SymbolInfo> symbols)
+    {
+        var techniques = new List<FxTechniqueInfo>();
+
+        void Traverse(NodeInfo node)
+        {
+            if (string.Equals(node.Kind, "TechniqueDeclaration", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(node.Kind, "Technique10Declaration", StringComparison.OrdinalIgnoreCase))
+            {
+                var technique = BuildTechnique(node, tokens, inference, symbols);
+                if (technique is not null)
                 {
-                    Traverse(child.Node);
+                    techniques.Add(technique);
                 }
             }
 
-            Traverse(rootNode);
+            foreach (var child in node.Children)
+            {
+                Traverse(child.Node);
+            }
+        }
+
+        Traverse(rootNode);
+        Validate(techniques, inference);
+        return techniques;
+    }
+
+    private static FxTechniqueInfo? BuildTechnique(NodeInfo node, TokenLookup tokens, TypeInference inference, List<SymbolInfo> symbols)
+    {
+        var name = tokens.GetChildIdentifierText(node, "identifier");
+        var body = GetChildNode(node, "body");
+        var passes = new List<FxPassInfo>();
+
+        if (body is not null)
+        {
+            foreach (var child in body.Children.Where(c => string.Equals(c.Role, "pass", StringComparison.OrdinalIgnoreCase)))
+            {
+                var pass = BuildPass(child.Node, tokens, symbols);
+                if (pass is not null)
+                {
+                    passes.Add(pass);
+                }
+            }
+        }
+
+        if (name is null && node.Span is not null)
+        {
+            inference.AddDiagnostic("HLSL5001", "Technique is missing a name.", node.Span);
+        }
+
+        return new FxTechniqueInfo
+        {
+            Name = name,
+            DeclNodeId = node.Id,
+            Passes = passes,
+            Span = node.Span
+        };
+    }
+
+    private static FxPassInfo? BuildPass(NodeInfo node, TokenLookup tokens, List<SymbolInfo> symbols)
+    {
+        var name = tokens.GetChildIdentifierText(node, "identifier");
+        var body = GetChildNode(node, "body");
+        var shaders = new List<FxShaderBinding>();
+        var states = new List<FxStateAssignment>();
+
+        if (body?.Span is Span span)
+        {
+            foreach (var statement in tokens.ExtractStatements(span))
+            {
+                if (statement.Count == 0) continue;
+
+                if (TryParseShaderBinding(statement, symbols, out var shader))
+                {
+                    shaders.Add(shader);
+                    continue;
+                }
+
+                if (TryParseState(statement, out var state))
+                {
+                    states.Add(state);
+                }
+            }
+        }
+
+        return new FxPassInfo
+        {
+            Name = name,
+            DeclNodeId = node.Id,
+            Shaders = shaders,
+            States = states,
+            Span = node.Span
+        };
+    }
+
+    private static bool TryParseShaderBinding(IReadOnlyList<TokenInfo> tokens, List<SymbolInfo> symbols, out FxShaderBinding shader)
+    {
+        shader = new FxShaderBinding();
+        if (tokens.Count < 5) return false;
+
+        var stage = StageFromIdentifier(tokens[0].Text);
+        if (stage is null) return false;
+
+        if (!string.Equals(tokens[1].Text, "=", StringComparison.Ordinal)) return false;
+        if (!string.Equals(tokens[2].Text, "compile", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var profile = tokens[3].Text;
+        var entry = tokens[4].Text;
+        var symbolId = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(s.Name, entry, StringComparison.OrdinalIgnoreCase))?.Id;
+
+        shader = new FxShaderBinding
+        {
+            Stage = stage,
+            Profile = profile,
+            Entry = entry,
+            EntrySymbolId = symbolId
+        };
+        return true;
+    }
+
+    private static bool TryParseState(IReadOnlyList<TokenInfo> tokens, out FxStateAssignment state)
+    {
+        state = new FxStateAssignment();
+        if (tokens.Count < 3) return false;
+        if (!string.Equals(tokens[1].Text, "=", StringComparison.Ordinal)) return false;
+
+        state = new FxStateAssignment
+        {
+            Name = tokens[0].Text,
+            Value = string.Join(" ", tokens.Skip(2).Select(t => t.Text))
+        };
+        return true;
+    }
+
+    private static void Validate(List<FxTechniqueInfo> techniques, TypeInference inference)
+    {
+        var techniqueNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var technique in techniques)
+        {
+            if (!string.IsNullOrWhiteSpace(technique.Name) && !techniqueNames.Add(technique.Name))
+            {
+                inference.AddDiagnostic("HLSL5002", $"Duplicate technique '{technique.Name}'.", technique.Span);
+            }
+
+            var passNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var pass in technique.Passes)
+            {
+                if (!string.IsNullOrWhiteSpace(pass.Name) && !passNames.Add(pass.Name))
+                {
+                    inference.AddDiagnostic("HLSL5003", $"Duplicate pass '{pass.Name}' in technique '{technique.Name}'.", pass.Span);
+                }
+
+                ValidatePass(pass, inference);
+            }
         }
     }
+
+    private static void ValidatePass(FxPassInfo pass, TypeInference inference)
+    {
+        var hasVs = pass.Shaders.Any(s => string.Equals(s.Stage, "Vertex", StringComparison.OrdinalIgnoreCase));
+        var hasPs = pass.Shaders.Any(s => string.Equals(s.Stage, "Pixel", StringComparison.OrdinalIgnoreCase));
+
+        if (!pass.Shaders.Any())
+        {
+            inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
+        }
+
+        if (hasVs ^ hasPs)
+        {
+            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a {(hasVs ? "Pixel" : "Vertex")} shader binding.", pass.Span);
+        }
+
+        foreach (var shader in pass.Shaders)
+        {
+            var stageFromProfile = StageFromProfile(shader.Profile);
+            if (!string.IsNullOrWhiteSpace(stageFromProfile) && !string.IsNullOrWhiteSpace(shader.Stage)
+                && !string.Equals(stageFromProfile, shader.Stage, StringComparison.OrdinalIgnoreCase))
+            {
+                inference.AddDiagnostic("HLSL5006", $"Shader '{shader.Stage}' uses profile '{shader.Profile}' (stage '{stageFromProfile}').", pass.Span);
+            }
+        }
+    }
+
+    private static string StageFromProfile(string? profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile)) return string.Empty;
+        if (profile.StartsWith("vs", true, CultureInfo.InvariantCulture)) return "Vertex";
+        if (profile.StartsWith("ps", true, CultureInfo.InvariantCulture)) return "Pixel";
+        if (profile.StartsWith("gs", true, CultureInfo.InvariantCulture)) return "Geometry";
+        if (profile.StartsWith("hs", true, CultureInfo.InvariantCulture)) return "Hull";
+        if (profile.StartsWith("ds", true, CultureInfo.InvariantCulture)) return "Domain";
+        if (profile.StartsWith("cs", true, CultureInfo.InvariantCulture)) return "Compute";
+        return string.Empty;
+    }
+
+    private static string? StageFromIdentifier(string identifier)
+    {
+        if (identifier.Equals("VertexShader", StringComparison.OrdinalIgnoreCase)) return "Vertex";
+        if (identifier.Equals("PixelShader", StringComparison.OrdinalIgnoreCase)) return "Pixel";
+        if (identifier.Equals("GeometryShader", StringComparison.OrdinalIgnoreCase)) return "Geometry";
+        if (identifier.Equals("HullShader", StringComparison.OrdinalIgnoreCase)) return "Hull";
+        if (identifier.Equals("DomainShader", StringComparison.OrdinalIgnoreCase)) return "Domain";
+        if (identifier.Equals("ComputeShader", StringComparison.OrdinalIgnoreCase)) return "Compute";
+        return null;
+    }
+
+    private static NodeInfo? GetChildNode(NodeInfo node, string role)
+    {
+        foreach (var child in node.Children)
+        {
+            if (string.Equals(child.Role, role, StringComparison.OrdinalIgnoreCase))
+            {
+                return child.Node;
+            }
+        }
+        return null;
+    }
+}
 
 internal static class SymbolBuilder
 {
@@ -571,6 +778,43 @@ internal sealed class TokenLookup
             .ToList();
     }
 
+    public IReadOnlyList<IReadOnlyList<TokenInfo>> ExtractStatements(Span span)
+    {
+        var slice = _tokens
+            .Where(t => t.Start >= span.Start && t.End <= span.End)
+            .OrderBy(t => t.Start)
+            .ToList();
+
+        var statements = new List<IReadOnlyList<TokenInfo>>();
+        var current = new List<TokenInfo>();
+        foreach (var token in slice)
+        {
+            if (token.Text is "{" or "}")
+            {
+                continue;
+            }
+
+            if (token.Text == ";")
+            {
+                if (current.Count > 0)
+                {
+                    statements.Add(current.ToList());
+                    current.Clear();
+                }
+                continue;
+            }
+
+            current.Add(token);
+        }
+
+        if (current.Count > 0)
+        {
+            statements.Add(current);
+        }
+
+        return statements;
+    }
+
     public string? ExtractArraySuffix(Span span)
     {
         var startIndex = _tokens.FindIndex(t => t.Start >= span.Start && t.Start <= span.End + 1 && t.Text == "[");
@@ -658,7 +902,6 @@ internal sealed class TokenLookup
         return true;
     }
 
-    private readonly record struct TokenInfo(int Start, int End, string Text);
 }
 
 internal sealed class TypeCollector
@@ -2041,6 +2284,8 @@ internal sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChil
 
 internal readonly record struct NodeChild(string Role, NodeInfo Node);
 
+internal readonly record struct TokenInfo(int Start, int End, string Text);
+
 internal readonly record struct Span(int Start, int End);
 
 internal sealed record SymbolBuildResult(List<SymbolInfo> Symbols, List<TypeInfo> Types, Dictionary<int, Span> Spans);
@@ -2065,6 +2310,9 @@ public sealed record SemanticOutput
     [JsonPropertyName("entryPoints")]
     public IReadOnlyList<EntryPointInfo> EntryPoints { get; init; } = Array.Empty<EntryPointInfo>();
 
+    [JsonPropertyName("techniques")]
+    public IReadOnlyList<FxTechniqueInfo> Techniques { get; init; } = Array.Empty<FxTechniqueInfo>();
+
     [JsonPropertyName("diagnostics")]
     public IReadOnlyList<DiagnosticInfo> Diagnostics { get; init; } = Array.Empty<DiagnosticInfo>();
 }
@@ -2088,6 +2336,63 @@ public sealed record EntryPointInfo
 
     [JsonPropertyName("profile")]
     public string? Profile { get; init; }
+}
+
+public sealed record FxTechniqueInfo
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("declNodeId")]
+    public int? DeclNodeId { get; init; }
+
+    [JsonPropertyName("passes")]
+    public IReadOnlyList<FxPassInfo> Passes { get; init; } = Array.Empty<FxPassInfo>();
+
+    [JsonIgnore]
+    internal Span? Span { get; init; }
+}
+
+public sealed record FxPassInfo
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("declNodeId")]
+    public int? DeclNodeId { get; init; }
+
+    [JsonPropertyName("shaders")]
+    public IReadOnlyList<FxShaderBinding> Shaders { get; init; } = Array.Empty<FxShaderBinding>();
+
+    [JsonPropertyName("states")]
+    public IReadOnlyList<FxStateAssignment> States { get; init; } = Array.Empty<FxStateAssignment>();
+
+    [JsonIgnore]
+    internal Span? Span { get; init; }
+}
+
+public sealed record FxShaderBinding
+{
+    [JsonPropertyName("stage")]
+    public string Stage { get; init; } = string.Empty;
+
+    [JsonPropertyName("profile")]
+    public string? Profile { get; init; }
+
+    [JsonPropertyName("entry")]
+    public string? Entry { get; init; }
+
+    [JsonPropertyName("entrySymbolId")]
+    public int? EntrySymbolId { get; init; }
+}
+
+public sealed record FxStateAssignment
+{
+    [JsonPropertyName("name")]
+    public string Name { get; init; } = string.Empty;
+
+    [JsonPropertyName("value")]
+    public string? Value { get; init; }
 }
 
 public sealed record SymbolInfo

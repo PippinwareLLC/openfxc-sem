@@ -106,4 +106,4 @@ High-level shape of `output.sem.json`:
 | SM2.x / SM3.x | Complete | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; semantics normalized/bound with stage/profile guards (SV blocked pre-SM4 for VS/PS params/returns); intrinsics expanded (including tex2D projected); snapshots/negatives; entryPoints emitted; backend-agnostic |
 | SM4.x | Complete | cbuffer symbols/members captured; semantics binding/validation for SV_* with stage/profile guards; SM4 intrinsics/resources covered; snapshots included; backend-agnostic |
 | SM5.x | Complete | Structured/RW resources recognized with symbols/types; SM5 semantics/intrinsics/resource coverage locked by snapshots/tests; backend-agnostic |
-| FX constructs (.fx) | Complete | Shader entry analysis only; technique/pass semantics diagnosed as unsupported |
+| FX constructs (.fx) | Complete | Techniques/passes captured with shader bindings and render states; diagnostics for missing VS/PS bindings, duplicate techniques/passes, and profile mismatches |

@@ -1,0 +1,143 @@
+{
+  "formatVersion": 2,
+  "profile": "vs_2_0",
+  "syntax": {
+    "rootId": 45
+  },
+  "symbols": [
+    {
+      "id": 7,
+      "kind": "Parameter",
+      "name": "p",
+      "type": "float4",
+      "declNodeId": 7,
+      "parentSymbolId": 13,
+      "semantic": {
+        "name": "POSITION",
+        "index": 0
+      }
+    },
+    {
+      "id": 13,
+      "kind": "Function",
+      "name": "main",
+      "type": "float4(float4)",
+      "declNodeId": 13,
+      "returnSemantic": {
+        "name": "SV_POSITION",
+        "index": 0
+      }
+    }
+  ],
+  "types": [
+    {
+      "nodeId": 1,
+      "type": "float4"
+    },
+    {
+      "nodeId": 3,
+      "type": "float4"
+    },
+    {
+      "nodeId": 13,
+      "type": "float4(float4)"
+    },
+    {
+      "nodeId": 2,
+      "type": "float4(float4)"
+    },
+    {
+      "nodeId": 4,
+      "type": "float4"
+    },
+    {
+      "nodeId": 10,
+      "type": "float4"
+    },
+    {
+      "nodeId": 23,
+      "type": "float4(float4)"
+    },
+    {
+      "nodeId": 24,
+      "type": "float4"
+    },
+    {
+      "nodeId": 33,
+      "type": "float4(float4)"
+    },
+    {
+      "nodeId": 34,
+      "type": "float4"
+    }
+  ],
+  "entryPoints": [
+    {
+      "name": "main",
+      "symbolId": 13,
+      "stage": "Vertex",
+      "profile": "vs_2_0"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Simple",
+      "declNodeId": 44,
+      "passes": [
+        {
+          "name": "First",
+          "declNodeId": 42,
+          "shaders": [
+            {
+              "stage": "Vertex",
+              "profile": "vs_2_0",
+              "entry": "main",
+              "entrySymbolId": 13
+            },
+            {
+              "stage": "Pixel",
+              "profile": "ps_2_0",
+              "entry": "main",
+              "entrySymbolId": 13
+            }
+          ],
+          "states": [
+            {
+              "name": "ZEnable",
+              "value": "TRUE"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "Error",
+      "id": "HLSL2001",
+      "message": "Function \u0027main\u0027 expects 1 arguments but got 0.",
+      "span": {
+        "start": 140,
+        "end": 147
+      }
+    },
+    {
+      "severity": "Error",
+      "id": "HLSL2001",
+      "message": "Function \u0027main\u0027 expects 1 arguments but got 0.",
+      "span": {
+        "start": 186,
+        "end": 193
+      }
+    },
+    {
+      "severity": "Error",
+      "id": "HLSL3002",
+      "message": "System-value semantic \u0027SV_POSITION\u0027 is not allowed before SM4.",
+      "span": {
+        "start": 0,
+        "end": 60
+      }
+    }
+  ]
+}
