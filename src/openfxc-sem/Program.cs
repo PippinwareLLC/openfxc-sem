@@ -453,7 +453,8 @@ internal static class Program
                 return null;
             }
 
-            var span = semantic.AsSpan();
+            var trimmed = semantic.TrimStart(' ', ':');
+            var span = trimmed.AsSpan();
             var i = span.Length - 1;
             while (i >= 0 && char.IsDigit(span[i]))
             {
@@ -472,7 +473,11 @@ internal static class Program
             }
 
             index ??= 0;
-            return new SemanticInfo { Name = namePart, Index = index };
+            var normalizedName = namePart.StartsWith("SV_", StringComparison.OrdinalIgnoreCase)
+                ? namePart.ToUpperInvariant()
+                : namePart.ToUpperInvariant();
+
+            return new SemanticInfo { Name = normalizedName, Index = index };
         }
 
         private static NodeInfo? GetChildNode(NodeInfo node, string role)
@@ -643,8 +648,8 @@ internal static class Program
             var colonIndex = tokens.FindIndex(t => t.Text == ":");
             if (colonIndex >= 0 && colonIndex + 1 < tokens.Count)
             {
-                var nameText = tokens[colonIndex + 1].Text;
-                return new SemanticInfo { Name = nameText, Index = 0 };
+                var nameText = tokens[colonIndex + 1].Text.TrimStart(':');
+                return new SemanticInfo { Name = nameText.ToUpperInvariant(), Index = 0 };
             }
 
             return null;

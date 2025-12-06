@@ -30,6 +30,21 @@ float4 main(float4 p : POSITION0) : SV_Position { return p; }";
         Assert.Equal("Pixel", entry.GetProperty("stage").GetString());
     }
 
+    [Fact]
+    public void Semantics_are_normalized_and_return_semantic_present()
+    {
+        var source = @"
+float4 main(float4 pos : position0) : sv_target { return pos; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var symbols = doc.RootElement.GetProperty("symbols").EnumerateArray().ToList();
+        var func = symbols.First(s => s.GetProperty("kind").GetString() == "Function");
+        var param = symbols.First(s => s.GetProperty("kind").GetString() == "Parameter");
+
+        Assert.Equal("SV_TARGET", func.GetProperty("returnSemantic").GetProperty("name").GetString());
+        Assert.Equal("POSITION", param.GetProperty("semantic").GetProperty("name").GetString());
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         var hlslPath = Path.Combine(Path.GetTempPath(), $"openfxc-sem-inline-{Guid.NewGuid():N}.hlsl");
