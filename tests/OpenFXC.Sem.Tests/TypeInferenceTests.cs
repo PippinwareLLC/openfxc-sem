@@ -182,6 +182,24 @@ float4 main(float3 a : TEXCOORD0) : COLOR0
         Assert.Contains(types, t => t.GetProperty("type").GetString() == "float3");
     }
 
+    [Fact]
+    public void Intrinsic_ddx_preserves_shape_sm4()
+    {
+        var source = @"
+float4 main(float2 uv : TEXCOORD0) : SV_Target
+{
+    float2 g = ddx(uv);
+    return float4(g, 0, 1);
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_4_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float2");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

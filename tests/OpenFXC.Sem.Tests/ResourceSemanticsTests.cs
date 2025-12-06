@@ -38,6 +38,29 @@ float4 main(uint id : SV_DispatchThreadID) : SV_Target
         Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "Resource" && s.GetProperty("name").GetString() == "Output" && (s.GetProperty("type").GetString() ?? string.Empty).StartsWith("RWStructuredBuffer", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void Captures_cbuffer_in_sm4()
+    {
+        const string source = @"
+cbuffer PerFrame : register(b0)
+{
+    float4x4 World;
+    float4 Color;
+};
+
+float4 main(float4 p : SV_Position) : SV_Position
+{
+    return mul(World, p) + Color;
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_4_0"));
+        var symbols = doc.RootElement.GetProperty("symbols").EnumerateArray().ToList();
+
+        Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "CBuffer" && s.GetProperty("name").GetString() == "PerFrame");
+        Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "CBufferMember" && s.GetProperty("name").GetString() == "World");
+        Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "CBufferMember" && s.GetProperty("name").GetString() == "Color");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

@@ -6,8 +6,8 @@
   - [x] Add targeted tests locking stage/profile semantic rules and intrinsic behaviors.
 
 - [ ] **MSC2: SM4 completion**
-  - [ ] Stage 1: Finish semantics binding/validation for all SV_* cases with stage/profile guards (SM4-only), with focused tests.
-  - [ ] Stage 2: Expand SM4 intrinsic/resource coverage and add positive/negative tests.
+  - [x] Stage 1: Finish semantics binding/validation for all SV_* cases with stage/profile guards (SM4-only), with focused tests.
+  - [x] Stage 2: Expand SM4 intrinsic/resource coverage and add positive/negative tests.
   - [ ] Stage 3: Refresh/add SM4 snapshots (VS/PS with SV_* semantics, cbuffer/tbuffer) plus negative cases.
   - [ ] Stage 4: Update docs/compatibility matrix and mark SM4 complete.
 

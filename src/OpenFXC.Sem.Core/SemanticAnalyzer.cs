@@ -948,6 +948,54 @@ internal static class Intrinsics
             Name = "lerp",
             Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Scalar("float") },
             ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddx",
+            Parameters = new [] { SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddx",
+            Parameters = new [] { SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddx",
+            Parameters = new [] { SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddx",
+            Parameters = new [] { SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddy",
+            Parameters = new [] { SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddy",
+            Parameters = new [] { SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddy",
+            Parameters = new [] { SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "ddy",
+            Parameters = new [] { SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
         }
     };
 
