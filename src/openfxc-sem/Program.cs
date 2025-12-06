@@ -144,6 +144,7 @@ internal static class Program
             int? rootId = null;
             List<SymbolInfo> symbols = new();
             List<TypeInfo> types = new();
+            List<DiagnosticInfo> diagnostics = new();
 
             try
             {
@@ -156,6 +157,7 @@ internal static class Program
                     var rootNode = NodeInfo.FromJson(rootNodeEl);
                     var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                     ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
+                    diagnostics.AddRange(_typeInference.Diagnostics);
                     symbols = build.Symbols;
                     types = build.Types;
                 }
@@ -165,6 +167,7 @@ internal static class Program
                 // On parse failure, emit minimal model with empty symbols.
                 symbols = new List<SymbolInfo>();
                 types = new List<TypeInfo>();
+                diagnostics = new List<DiagnosticInfo>();
             }
 
             return new SemanticOutput
@@ -175,7 +178,7 @@ internal static class Program
                 Symbols = symbols,
                 Types = types,
                 EntryPoints = Array.Empty<EntryPointInfo>(),
-                Diagnostics = Array.Empty<DiagnosticInfo>()
+                Diagnostics = diagnostics
             };
         }
 
@@ -662,6 +665,7 @@ internal static class Program
     private sealed class TypeInference
     {
         private readonly Dictionary<int, string> _nodeTypes = new();
+        private readonly List<DiagnosticInfo> _diagnostics = new();
 
         public string? NormalizeType(string? type)
         {
@@ -701,6 +705,18 @@ internal static class Program
             if (nodeId is null) return null;
             return _nodeTypes.TryGetValue(nodeId.Value, out var t) ? t : null;
         }
+
+        public void AddDiagnostic(string id, string message)
+        {
+            _diagnostics.Add(new DiagnosticInfo
+            {
+                Severity = "Error",
+                Id = id,
+                Message = message
+            });
+        }
+
+        public IReadOnlyList<DiagnosticInfo> Diagnostics => _diagnostics;
     }
 
     private static class ExpressionTypeAnalyzer
@@ -796,6 +812,22 @@ internal static class Program
                 {
                     inferred = argTypes.Last() ?? argTypes.First();
                 }
+                else
+                {
+                    // Constructor-style: if callee is a type name, expect args to be convertible.
+                    if (IsTypeName(calleeName))
+                    {
+                        inferred = calleeName;
+                        if (argTypes.Any(a => a is null))
+                        {
+                            typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                typeInference.AddDiagnostic("HLSL2003", "Call expression missing callee.");
             }
 
             AddType(types, typeInference, node.Id, inferred);
@@ -809,6 +841,10 @@ internal static class Program
             var rt = typeInference.GetNodeType(right?.Id);
 
             var merged = MergeBinaryTypes(lt, rt);
+            if (merged is null && lt is not null && rt is not null)
+            {
+                typeInference.AddDiagnostic("HLSL2002", $"Type mismatch in binary expression: '{lt}' vs '{rt}'.");
+            }
             AddType(types, typeInference, node.Id, merged);
         }
 
@@ -1044,6 +1080,15 @@ internal static class Program
     }
 
     private sealed record EntryPointInfo;
+    private sealed record DiagnosticInfo
+    {
+        [JsonPropertyName("severity")]
+        public string Severity { get; init; } = "Error";
 
-    private sealed record DiagnosticInfo;
+        [JsonPropertyName("id")]
+        public string Id { get; init; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string Message { get; init; } = string.Empty;
+    }
 }
