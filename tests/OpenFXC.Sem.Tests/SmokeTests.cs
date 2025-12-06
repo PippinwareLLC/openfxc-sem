@@ -123,6 +123,8 @@ public class SmokeTests
 
     private static string RunParseThenAnalyze(string hlslRelativePath, string profile)
     {
+        BuildHelper.EnsureBuilt();
+
         var repoRoot = RepoPath();
         var hlslPath = Path.Combine(repoRoot, hlslRelativePath);
 

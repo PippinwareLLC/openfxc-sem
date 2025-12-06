@@ -82,8 +82,8 @@ High-level shape of `output.sem.json`:
 
 | Shader Model / Era | Semantics Coverage | Notes |
 | --- | --- | --- |
-| SM1.x (legacy D3D9) | Early | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape checks pending; backend-agnostic |
-| SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/negative tests pending; backend-agnostic |
+| SM1.x (legacy D3D9) | Early | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape validation with diagnostics; backend-agnostic |
+| SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; backend-agnostic |
 | SM4.x | Planned | cbuffer/tbuffer symbols and resource types; semantics binding (including SV_*); stronger type inference |
 | SM5.x | Planned | Structured/RW resources; broader intrinsic/type coverage; backend-agnostic |
 | FX constructs (.fx) | Early | Shader entry analysis only; technique/pass semantics not computed |
