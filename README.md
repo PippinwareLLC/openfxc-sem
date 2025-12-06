@@ -98,6 +98,12 @@ High-level shape of `output.sem.json`:
 - Full spec/TDD: `docs/TDD.md`
 - Work queue: `docs/TODO.md`
 - Milestones: `docs/MILESTONES.md`
+- Techniques/Passes: `docs/MILESTONES_TECHNIQUES_PASSES.md`, `docs/TODO_TECHNIQUES_PASSES.md`
+- Parity: `docs/MILESTONES_PARITY.md`
+
+## Attribution
+- DXSDK samples under `samples/dxsdk/` are from Microsoft DirectX SDK (Aug 2008), used here for integration testing.
+- Additional test shaders and snapshots under `tests/snapshots/` are adapted for coverage within this project.
 
 ## Compatibility Matrix (Semantics)
 
