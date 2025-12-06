@@ -1,6 +1,6 @@
 # Milestones
 
-- [ ] **M0: Bootstrap**
+- [x] **M0: Bootstrap**
   - CLI skeleton for `openfxc-sem analyze` with stdin/file IO and JSON output per `docs/TDD.md`.
   - Semantic JSON schema drafted and sample outputs captured.
   - Basic smoke run wiring.

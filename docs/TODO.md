@@ -1,7 +1,7 @@
 # TODO
 
 ## Foundation
-- [ ] Stand up `openfxc-sem analyze` CLI that reads `openfxc-hlsl` AST JSON from stdin/file and emits semantic JSON per `docs/TDD.md`.
+- [x] Stand up `openfxc-sem analyze` CLI that reads `openfxc-hlsl` AST JSON from stdin/file and emits semantic JSON per `docs/TDD.md`.
 - [ ] Establish semantic JSON schema (`formatVersion`, profile metadata, symbols, types, entryPoints, diagnostics) and pin sample outputs.
 - [ ] Stabilize diagnostic IDs/messages (e.g., `HLSL2xxx`), spans, and error recovery so partial models are always produced.
 

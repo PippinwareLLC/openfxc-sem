@@ -1,2 +1,4 @@
 tests/OpenFXC.Sem.Tests/bin/**
 tests/OpenFXC.Sem.Tests/obj/**
+src/openfxc-sem/bin/**
+src/openfxc-sem/obj/**

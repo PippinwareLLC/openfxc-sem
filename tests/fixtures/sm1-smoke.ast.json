@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1,
+  "root": {
+    "id": 1,
+    "kind": "HlslCompilationUnit"
+  },
+  "tokens": [],
+  "diagnostics": [],
+  "source": {
+    "path": "sm1-smoke.hlsl",
+    "length": 0
+  }
+}
