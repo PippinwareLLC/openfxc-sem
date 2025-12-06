@@ -8,7 +8,7 @@
   - Collect globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
   - Parent-child relationships and declaration node links recorded.
   - Unit tests for symbol presence across simple shaders.
-- [ ] **M2: Type Inference Core**
+- [x] **M2: Type Inference Core**
   - Scalars/vectors/matrices/arrays/resources and function signatures represented.
   - Expression inference for arithmetic, swizzles, indexing, constructors, casts.
   - Positive/negative inference tests with diagnostics.

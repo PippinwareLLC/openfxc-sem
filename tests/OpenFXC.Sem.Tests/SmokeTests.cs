@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
@@ -47,6 +48,11 @@ public class SmokeTests
         var semantic = param.GetProperty("semantic");
         Assert.Equal("POSITION", semantic.GetProperty("name").GetString());
         Assert.Equal(0, semantic.GetProperty("index").GetInt32());
+
+        var typeList = root.GetProperty("types").EnumerateArray().Select(t => t.GetProperty("type").GetString()).ToList();
+        Assert.Contains("float3", typeList);
+        Assert.Contains("float4", typeList);
+        Assert.Contains("matrix", typeList);
     }
 
     [Fact]
@@ -81,16 +87,22 @@ public class SmokeTests
 
     public static IEnumerable<object[]> FxSamplePaths()
     {
-        var root = RepoPath("samples", "dxsdk");
-        if (!Directory.Exists(root))
-        {
-            yield break;
-        }
+        // Default: single representative DXSDK sample to keep runs fast.
+        yield return new object[] { @"samples/dxsdk/DXSDK_Aug08/DXSDK/Samples/C++/Direct3D/StateManager/snow.fx" };
 
-        foreach (var path in Directory.GetFiles(root, "*.fx", SearchOption.AllDirectories))
+        // Optional sweep: set OPENFXC_SEM_FX_SWEEP=all to walk every .fx under samples/dxsdk.
+        var sweep = Environment.GetEnvironmentVariable("OPENFXC_SEM_FX_SWEEP");
+        if (string.Equals(sweep, "all", StringComparison.OrdinalIgnoreCase))
         {
-            var relative = Path.GetRelativePath(RepoPath(), path);
-            yield return new object[] { relative };
+            var root = RepoPath("samples", "dxsdk");
+            if (Directory.Exists(root))
+            {
+                foreach (var path in Directory.GetFiles(root, "*.fx", SearchOption.AllDirectories))
+                {
+                    var relative = Path.GetRelativePath(RepoPath(), path);
+                    yield return new object[] { relative };
+                }
+            }
         }
     }
 

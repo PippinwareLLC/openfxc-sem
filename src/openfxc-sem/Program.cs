@@ -142,18 +142,22 @@ internal static class Program
         {
             int? rootId = null;
             List<SymbolInfo> symbols = new();
+            List<TypeInfo> types = new();
 
             try
             {
                 using var doc = JsonDocument.Parse(_inputJson);
                 var root = doc.RootElement;
                 rootId = TryGetRootId(root);
-                symbols = SymbolBuilder.Build(root);
+                var build = SymbolBuilder.Build(root);
+                symbols = build.Symbols;
+                types = build.Types;
             }
             catch
             {
                 // On parse failure, emit minimal model with empty symbols.
                 symbols = new List<SymbolInfo>();
+                types = new List<TypeInfo>();
             }
 
             return new SemanticOutput
@@ -162,7 +166,7 @@ internal static class Program
                 Profile = _profile,
                 Syntax = rootId is null ? null : new SyntaxInfo { RootId = rootId.Value },
                 Symbols = symbols,
-                Types = Array.Empty<TypeInfo>(),
+                Types = types,
                 EntryPoints = Array.Empty<EntryPointInfo>(),
                 Diagnostics = Array.Empty<DiagnosticInfo>()
             };
@@ -184,31 +188,34 @@ internal static class Program
 
     private static class SymbolBuilder
     {
-        public static List<SymbolInfo> Build(JsonElement root)
+        public static SymbolBuildResult Build(JsonElement root)
         {
             if (!root.TryGetProperty("root", out var rootNodeEl))
             {
-                return new List<SymbolInfo>();
+                return new SymbolBuildResult(new List<SymbolInfo>(), new List<TypeInfo>());
             }
 
             var tokens = TokenLookup.From(root);
             var rootNode = NodeInfo.FromJson(rootNodeEl);
             var symbols = new List<SymbolInfo>();
-            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, tokens);
-            return symbols.OrderBy(s => s.Id ?? int.MaxValue).ToList();
+            var typeCollector = new TypeCollector();
+            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, typeCollector, tokens);
+            return new SymbolBuildResult(
+                symbols.OrderBy(s => s.Id ?? int.MaxValue).ToList(),
+                typeCollector.ToList());
         }
 
-        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TokenLookup tokens)
+        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens)
         {
             switch (node.Kind)
             {
                 case "FunctionDeclaration":
-                    HandleFunction(node, symbols, tokens);
+                    HandleFunction(node, symbols, types, tokens);
                     currentFunctionId = node.Id;
                     break;
                 case "Parameter":
                     {
-                        var param = BuildParameterSymbol(node, tokens, currentFunctionId);
+                        var param = BuildParameterSymbol(node, tokens, currentFunctionId, types);
                         if (param is not null)
                         {
                             symbols.Add(param);
@@ -217,7 +224,7 @@ internal static class Program
                     break;
                 case "VariableDeclaration":
                     {
-                        var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens);
+                        var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens, types);
                         if (variable is not null)
                         {
                             symbols.Add(variable);
@@ -232,6 +239,7 @@ internal static class Program
                             symbols.Add(structSym);
                             currentStructId = structSym.Id;
                         }
+                        types.Add(node.Id, tokens.GetChildIdentifierText(node, "identifier"));
                     }
                     break;
                 case "CBufferDeclaration":
@@ -242,7 +250,11 @@ internal static class Program
                             symbols.Add(cbufSym);
                             currentStructId = cbufSym.Id;
                         }
+                        types.Add(node.Id, tokens.GetChildIdentifierText(node, "identifier"));
                     }
+                    break;
+                case "Type":
+                    types.Add(node.Id, tokens.GetText(node.Span));
                     break;
                 default:
                     break;
@@ -250,11 +262,11 @@ internal static class Program
 
             foreach (var child in node.Children)
             {
-                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, tokens);
+                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, types, tokens);
             }
         }
 
-        private static void HandleFunction(NodeInfo node, List<SymbolInfo> symbols, TokenLookup tokens)
+        private static void HandleFunction(NodeInfo node, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens)
         {
             if (node.Id is null) return;
             var name = tokens.GetChildIdentifierText(node, "identifier");
@@ -270,7 +282,13 @@ internal static class Program
                 }
             }
 
+            var typeNode = GetChildNode(node, "type");
+            var typeNodeId = typeNode?.Id ?? node.Id;
+            types.Add(typeNodeId, returnType);
+
             var funcType = BuildFunctionType(returnType, parameterTypes);
+            types.Add(node.Id, funcType);
+
             symbols.Add(new SymbolInfo
             {
                 Id = node.Id,
@@ -281,7 +299,7 @@ internal static class Program
             });
         }
 
-        private static SymbolInfo? BuildParameterSymbol(NodeInfo node, TokenLookup tokens, int? parentSymbolId)
+        private static SymbolInfo? BuildParameterSymbol(NodeInfo node, TokenLookup tokens, int? parentSymbolId, TypeCollector types)
         {
             if (node.Id is null) return null;
             var name = tokens.GetChildIdentifierText(node, "identifier");
@@ -299,6 +317,10 @@ internal static class Program
                 semantic = tokens.InferSemantic(node.Span.Value);
             }
 
+            var typeNode = GetChildNode(node, "type");
+            var typeNodeId = typeNode?.Id ?? node.Id;
+            types.Add(typeNodeId, type);
+
             return new SymbolInfo
             {
                 Id = node.Id,
@@ -311,7 +333,7 @@ internal static class Program
             };
         }
 
-        private static SymbolInfo? BuildVariableSymbol(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, TokenLookup tokens)
+        private static SymbolInfo? BuildVariableSymbol(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, TokenLookup tokens, TypeCollector types)
         {
             if (node.Id is null) return null;
 
@@ -328,6 +350,10 @@ internal static class Program
             };
 
             var parentSymbolId = parentKind == "TypeBody" ? currentStructId : currentFunctionId;
+
+            var typeNode = GetChildNode(node, "type");
+            var typeNodeId = typeNode?.Id ?? node.Id;
+            types.Add(typeNodeId, type);
 
             return new SymbolInfo
             {
@@ -414,6 +440,18 @@ internal static class Program
             index ??= 0;
             return new SemanticInfo { Name = namePart, Index = index };
         }
+
+        private static NodeInfo? GetChildNode(NodeInfo node, string role)
+        {
+            foreach (var child in node.Children)
+            {
+                if (string.Equals(child.Role, role, StringComparison.OrdinalIgnoreCase))
+                {
+                    return child.Node;
+                }
+            }
+            return null;
+        }
     }
 
     private sealed class TokenLookup
@@ -493,6 +531,12 @@ internal static class Program
                 .OrderBy(t => t.Start)
                 .Select(t => t.Text));
             return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+
+        public string? GetText(Span? span)
+        {
+            if (span is null) return null;
+            return GetText(span.Value);
         }
 
         public (string? name, string? type) InferParameterNameAndType(Span span, string? fallbackName, string? fallbackType)
@@ -586,6 +630,27 @@ internal static class Program
         private readonly record struct TokenInfo(int Start, int End, string Text);
     }
 
+    private sealed class TypeCollector
+    {
+        private readonly Dictionary<int, string> _types = new();
+
+        public void Add(int? nodeId, string? type)
+        {
+            if (nodeId is null) return;
+            if (string.IsNullOrWhiteSpace(type)) return;
+            if (_types.ContainsKey(nodeId.Value)) return;
+            _types[nodeId.Value] = type!;
+        }
+
+        public List<TypeInfo> ToList()
+        {
+            return _types
+                .OrderBy(kv => kv.Key)
+                .Select(kv => new TypeInfo { NodeId = kv.Key, Type = kv.Value })
+                .ToList();
+        }
+    }
+
     private sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChild> Children)
     {
         public static NodeInfo FromJson(JsonElement element)
@@ -623,6 +688,8 @@ internal static class Program
     private readonly record struct NodeChild(string Role, NodeInfo Node);
 
     private readonly record struct Span(int Start, int End);
+
+    private sealed record SymbolBuildResult(List<SymbolInfo> Symbols, List<TypeInfo> Types);
 
     private sealed record SemanticOutput
     {
@@ -687,7 +754,14 @@ internal static class Program
         public int? Index { get; init; }
     }
 
-    private sealed record TypeInfo;
+    private sealed record TypeInfo
+    {
+        [JsonPropertyName("nodeId")]
+        public int? NodeId { get; init; }
+
+        [JsonPropertyName("type")]
+        public string? Type { get; init; }
+    }
 
     private sealed record EntryPointInfo;
 

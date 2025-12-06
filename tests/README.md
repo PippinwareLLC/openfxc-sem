@@ -7,6 +7,7 @@ Suite layout mirrors `openfxc-hlsl`:
 - `run-all.*`: convenience scripts to run the full suite locally.
 - Integration smoke currently parses DXSDK sample shaders via the `openfxc-hlsl` submodule (e.g., `samples/dxsdk/.../snow.fx`) to produce ASTs before semantic analysis.
 - DXSDK sweep: `SmokeTests` walks all `samples/dxsdk/**/*.fx` files, parses them with `openfxc-hlsl`, and ensures `openfxc-sem analyze` succeeds.
+- Default test target is a single DXSDK sample (`snow.fx`) to keep runs fast. Set `OPENFXC_SEM_FX_SWEEP=all` to enable full `.fx` sweep.
 
 Run locally:
 - Windows: `tests\\run-all.cmd`
