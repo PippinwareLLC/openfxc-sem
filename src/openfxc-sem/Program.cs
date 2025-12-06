@@ -280,6 +280,12 @@ internal static class Program
             var returnType = tokens.GetChildTypeText(node, "type") ?? "void";
             var returnSemantic = ParseSemanticString(tokens.GetAnnotationText(node));
 
+            if (!string.IsNullOrWhiteSpace(name) && symbols.Any(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase) && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                typeInference.AddDiagnostic("HLSL1003", $"Duplicate function '{name}'.", node.Span);
+                return;
+            }
+
             var parameterTypes = new List<string>();
             foreach (var child in node.Children.Where(c => string.Equals(c.Role, "parameter", StringComparison.OrdinalIgnoreCase)))
             {
@@ -804,7 +810,7 @@ internal static class Program
             }
         };
 
-        public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference)
+        public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
         {
             var matches = Catalog.Where(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
             if (matches.Count == 0)
@@ -838,7 +844,7 @@ internal static class Program
                 return sig.ReturnResolver(args.Select((a, i) => a ?? sig.Parameters[i]).ToList());
             }
 
-            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.");
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
             return null;
         }
 
@@ -1262,13 +1268,14 @@ internal static class Program
             return NormalizeType(t);
         }
 
-        public void AddDiagnostic(string id, string message)
+        public void AddDiagnostic(string id, string message, Span? span = null)
         {
             _diagnostics.Add(new DiagnosticInfo
             {
                 Severity = "Error",
                 Id = id,
-                Message = message
+                Message = message,
+                Span = span is null ? null : new DiagnosticSpan { Start = span.Value.Start, End = span.Value.End }
             });
         }
 
@@ -1301,6 +1308,10 @@ internal static class Program
                             if (name is not null && symbolTypes.TryGetValue(name, out var t) && t is not null)
                             {
                                 AddType(types, typeInference, node.Id, t);
+                            }
+                            else
+                            {
+                                typeInference.AddDiagnostic("HLSL2005", $"Unknown identifier '{name ?? "<unknown>"}'.", node.Span);
                             }
                         }
                         break;
@@ -1355,14 +1366,14 @@ internal static class Program
             if (!string.IsNullOrWhiteSpace(calleeName))
             {
                 // Intrinsic resolution first.
-                inferred = Intrinsics.Resolve(calleeName!, argTypes, typeInference);
+                inferred = Intrinsics.Resolve(calleeName!, argTypes, typeInference, node.Span);
 
                 if (inferred is null)
                 {
                     if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Kind == TypeKind.Function)
                     {
                         inferred = fnType.ReturnType;
-                        CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference);
+                        CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference, node.Span);
                     }
                     else
                     {
@@ -1370,25 +1381,25 @@ internal static class Program
                         if (ctorType is not null)
                         {
                             inferred = ctorType;
-                            CheckConstructorArguments(calleeName!, ctorType, argTypes, typeInference);
+                            CheckConstructorArguments(calleeName!, ctorType, argTypes, typeInference, node.Span);
                         }
                     }
                 }
             }
             else
             {
-                typeInference.AddDiagnostic("HLSL2003", "Call expression missing callee.");
+                typeInference.AddDiagnostic("HLSL2003", "Call expression missing callee.", node.Span);
             }
 
             AddType(types, typeInference, node.Id, inferred);
         }
 
-        private static void CheckCallCompatibility(string calleeName, SemType functionType, IReadOnlyList<SemType?> args, TypeInference typeInference)
+        private static void CheckCallCompatibility(string calleeName, SemType functionType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span)
         {
             var parameters = functionType.ParameterTypes ?? Array.Empty<SemType>();
             if (parameters.Count != args.Count)
             {
-                typeInference.AddDiagnostic("HLSL2001", $"Function '{calleeName}' expects {parameters.Count} arguments but got {args.Count}.");
+                typeInference.AddDiagnostic("HLSL2001", $"Function '{calleeName}' expects {parameters.Count} arguments but got {args.Count}.", span);
                 return;
             }
 
@@ -1398,13 +1409,13 @@ internal static class Program
                 var param = parameters[i];
                 if (arg is null || !TypeCompatibility.CanPromote(arg, param))
                 {
-                    typeInference.AddDiagnostic("HLSL2001", $"Cannot convert argument {i} to parameter of type '{param}'.");
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot convert argument {i} to parameter of type '{param}'.", span);
                     return;
                 }
             }
         }
 
-        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference)
+        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span)
         {
             if (args.Count == 0) return;
 
@@ -1419,7 +1430,7 @@ internal static class Program
                 {
                     if (arg is null || !TypeCompatibility.CanPromote(arg, SemType.Scalar(targetType.BaseType)))
                     {
-                        typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.");
+                        typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
                         return;
                     }
                     provided += CountComponents(arg);
@@ -1427,7 +1438,7 @@ internal static class Program
 
                 if (provided != required)
                 {
-                    typeInference.AddDiagnostic("HLSL2001", $"Constructor '{calleeName}' expects {required} components but got {provided}.");
+                    typeInference.AddDiagnostic("HLSL2001", $"Constructor '{calleeName}' expects {required} components but got {provided}.", span);
                 }
                 return;
             }
@@ -1436,7 +1447,7 @@ internal static class Program
             {
                 if (arg is null || !TypeCompatibility.CanPromote(arg, targetType))
                 {
-                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.");
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
                     return;
                 }
             }
@@ -1462,7 +1473,7 @@ internal static class Program
             var merged = TypeCompatibility.PromoteBinary(lt, rt);
             if (merged is null && lt is not null && rt is not null)
             {
-                typeInference.AddDiagnostic("HLSL2002", $"Type mismatch in binary expression: '{lt}' vs '{rt}'.");
+                typeInference.AddDiagnostic("HLSL2002", $"Type mismatch in binary expression: '{lt}' vs '{rt}'.", node.Span);
             }
             AddType(types, typeInference, node.Id, merged);
         }
@@ -1802,5 +1813,17 @@ internal static class Program
 
         [JsonPropertyName("message")]
         public string Message { get; init; } = string.Empty;
+
+        [JsonPropertyName("span")]
+        public DiagnosticSpan? Span { get; init; }
+    }
+
+    private sealed record DiagnosticSpan
+    {
+        [JsonPropertyName("start")]
+        public int Start { get; init; }
+
+        [JsonPropertyName("end")]
+        public int End { get; init; }
     }
 }
