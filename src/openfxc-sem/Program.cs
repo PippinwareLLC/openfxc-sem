@@ -702,6 +702,160 @@ internal static class Program
         Function
     }
 
+    private sealed record IntrinsicSignature
+    {
+        public string Name { get; init; } = string.Empty;
+        public IReadOnlyList<SemType> Parameters { get; init; } = System.Array.Empty<SemType>();
+        public Func<IReadOnlyList<SemType>, SemType?> ReturnResolver { get; init; } = _ => null;
+    }
+
+    private static class Intrinsics
+    {
+        private static readonly IReadOnlyList<IntrinsicSignature> Catalog = new List<IntrinsicSignature>
+        {
+            new IntrinsicSignature
+            {
+                Name = "dot",
+                Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
+                ReturnResolver = _ => SemType.Scalar("float")
+            },
+            new IntrinsicSignature
+            {
+                Name = "dot",
+                Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) },
+                ReturnResolver = _ => SemType.Scalar("float")
+            },
+            new IntrinsicSignature
+            {
+                Name = "normalize",
+                Parameters = new [] { SemType.Vector("float", 3) },
+                ReturnResolver = args => args.FirstOrDefault()
+            },
+            new IntrinsicSignature
+            {
+                Name = "normalize",
+                Parameters = new [] { SemType.Vector("float", 4) },
+                ReturnResolver = args => args.FirstOrDefault()
+            },
+            new IntrinsicSignature
+            {
+                Name = "saturate",
+                Parameters = new [] { SemType.Scalar("float") },
+                ReturnResolver = args => args.FirstOrDefault()
+            },
+            new IntrinsicSignature
+            {
+                Name = "saturate",
+                Parameters = new [] { SemType.Vector("float", 2) },
+                ReturnResolver = args => args.FirstOrDefault()
+            },
+            new IntrinsicSignature
+            {
+                Name = "saturate",
+                Parameters = new [] { SemType.Vector("float", 3) },
+                ReturnResolver = args => args.FirstOrDefault()
+            },
+            new IntrinsicSignature
+            {
+                Name = "saturate",
+                Parameters = new [] { SemType.Vector("float", 4) },
+                ReturnResolver = args => args.FirstOrDefault()
+            },
+            new IntrinsicSignature
+            {
+                Name = "mul",
+                Parameters = new [] { SemType.Matrix("float", 4, 4), SemType.Vector("float", 4) },
+                ReturnResolver = args => DetermineMulReturn(args)
+            },
+            new IntrinsicSignature
+            {
+                Name = "mul",
+                Parameters = new [] { SemType.Vector("float", 4), SemType.Matrix("float", 4, 4) },
+                ReturnResolver = args => DetermineMulReturn(args)
+            },
+            new IntrinsicSignature
+            {
+                Name = "mul",
+                Parameters = new [] { SemType.Matrix("float", 3, 3), SemType.Vector("float", 3) },
+                ReturnResolver = args => DetermineMulReturn(args)
+            },
+            new IntrinsicSignature
+            {
+                Name = "mul",
+                Parameters = new [] { SemType.Vector("float", 3), SemType.Matrix("float", 3, 3) },
+                ReturnResolver = args => DetermineMulReturn(args)
+            },
+            new IntrinsicSignature
+            {
+                Name = "tex2D",
+                Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2) },
+                ReturnResolver = _ => SemType.Vector("float", 4)
+            }
+        };
+
+        public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference)
+        {
+            var matches = Catalog.Where(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0)
+            {
+                return null;
+            }
+
+            foreach (var sig in matches)
+            {
+                if (sig.Parameters.Count != args.Count)
+                {
+                    continue;
+                }
+
+                var compatible = true;
+                for (var i = 0; i < sig.Parameters.Count; i++)
+                {
+                    var arg = args[i];
+                    if (arg is null || !TypeCompatibility.CanPromote(arg, sig.Parameters[i]))
+                    {
+                        compatible = false;
+                        break;
+                    }
+                }
+
+                if (!compatible)
+                {
+                    continue;
+                }
+
+                return sig.ReturnResolver(args.Select((a, i) => a ?? sig.Parameters[i]).ToList());
+            }
+
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.");
+            return null;
+        }
+
+        private static SemType? DetermineMulReturn(IReadOnlyList<SemType> args)
+        {
+            if (args.Count != 2) return null;
+            var a = args[0];
+            var b = args[1];
+
+            if (a.Kind == TypeKind.Matrix && b.Kind == TypeKind.Vector && a.Columns == b.VectorSize)
+            {
+                return SemType.Vector(a.BaseType, a.Rows);
+            }
+
+            if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Matrix && a.VectorSize == b.Rows)
+            {
+                return SemType.Vector(b.BaseType, b.Columns);
+            }
+
+            if (a.Kind == TypeKind.Matrix && b.Kind == TypeKind.Matrix && a.Columns == b.Rows)
+            {
+                return SemType.Matrix(a.BaseType, a.Rows, b.Columns);
+            }
+
+            return b.Kind == TypeKind.Vector ? b : a;
+        }
+    }
+
     private sealed record SemType
     {
         public TypeKind Kind { get; init; }
@@ -1189,22 +1343,24 @@ internal static class Program
             SemType? inferred = null;
             if (!string.IsNullOrWhiteSpace(calleeName))
             {
-                if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Kind == TypeKind.Function)
+                // Intrinsic resolution first.
+                inferred = Intrinsics.Resolve(calleeName!, argTypes, typeInference);
+
+                if (inferred is null)
                 {
-                    inferred = fnType.ReturnType;
-                    CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference);
-                }
-                else if (string.Equals(calleeName, "mul", StringComparison.OrdinalIgnoreCase) && argTypes.Count >= 1)
-                {
-                    inferred = argTypes.Last() ?? argTypes.First();
-                }
-                else
-                {
-                    var ctorType = typeInference.ParseType(calleeName);
-                    if (ctorType is not null)
+                    if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Kind == TypeKind.Function)
                     {
-                        inferred = ctorType;
-                        CheckConstructorArguments(calleeName!, ctorType, argTypes, typeInference);
+                        inferred = fnType.ReturnType;
+                        CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference);
+                    }
+                    else
+                    {
+                        var ctorType = typeInference.ParseType(calleeName);
+                        if (ctorType is not null)
+                        {
+                            inferred = ctorType;
+                            CheckConstructorArguments(calleeName!, ctorType, argTypes, typeInference);
+                        }
                     }
                 }
             }

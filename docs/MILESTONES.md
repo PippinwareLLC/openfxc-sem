@@ -12,10 +12,10 @@
   - Scalars/vectors/matrices/arrays/resources and function signatures represented (structured SemType model across symbols/expressions).
   - Expression inference for arithmetic, swizzles, indexing, constructors, casts with constructor shape/arity validation and binary mismatch diagnostics.
   - Positive/negative inference tests added (constructor over-fill, binary type mismatch, array declarator preservation).
-- [ ] **M3: Intrinsic Resolution**
-  - Intrinsic catalog (mul/dot/normalize/saturate/tex2D/etc.) with deterministic signatures.
-  - Arity/type checking with diagnostics on misuse.
-  - Intrinsic-focused unit and negative tests.
+- [x] **M3: Intrinsic Resolution**
+  - Intrinsic catalog (initial set: mul/dot/normalize/saturate/tex2D) with deterministic signatures.
+  - Arity/type checking with diagnostics on misuse (HLSL2001 for bad overload/arity).
+  - Intrinsic-focused unit and negative tests added.
 - [ ] **M4: Semantics and Entry Points**
   - Normalize legacy and `SV_*` semantics; bind to params/returns and symbols.
   - Entry-point resolution (default and `--entry`), stage derived from profile.
