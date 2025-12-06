@@ -67,6 +67,13 @@ public class SnapshotTests
             "vs_2_0",
             RepoPath("tests", "snapshots", "fx_basic.sem.json")
         };
+
+        yield return new object[]
+        {
+            RepoPath("tests", "snapshots", "ps_sm3_texproj.hlsl"),
+            "ps_3_0",
+            RepoPath("tests", "snapshots", "ps_sm3_texproj.sem.json")
+        };
     }
 
     private static string RunParseThenAnalyze(string hlslPath, string profile)

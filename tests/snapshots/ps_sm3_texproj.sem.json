@@ -1,0 +1,110 @@
+{
+  "formatVersion": 2,
+  "profile": "ps_3_0",
+  "syntax": {
+    "rootId": 20
+  },
+  "symbols": [
+    {
+      "id": 3,
+      "kind": "Sampler",
+      "name": "S",
+      "type": "sampler2D",
+      "declNodeId": 3
+    },
+    {
+      "id": 10,
+      "kind": "Parameter",
+      "name": "uvw",
+      "type": "float3",
+      "declNodeId": 10,
+      "parentSymbolId": 19,
+      "semantic": {
+        "name": "TEXCOORD",
+        "index": 0
+      }
+    },
+    {
+      "id": 19,
+      "kind": "Function",
+      "name": "main",
+      "type": "float4(float3)",
+      "declNodeId": 19,
+      "returnSemantic": {
+        "name": "SV_TARGET",
+        "index": 0
+      }
+    }
+  ],
+  "types": [
+    {
+      "nodeId": 1,
+      "type": "sampler2d"
+    },
+    {
+      "nodeId": 4,
+      "type": "float4"
+    },
+    {
+      "nodeId": 6,
+      "type": "float3"
+    },
+    {
+      "nodeId": 19,
+      "type": "float4(float3)"
+    },
+    {
+      "nodeId": 2,
+      "type": "sampler2d"
+    },
+    {
+      "nodeId": 5,
+      "type": "float4(float3)"
+    },
+    {
+      "nodeId": 7,
+      "type": "float3"
+    },
+    {
+      "nodeId": 14,
+      "type": "sampler2d"
+    },
+    {
+      "nodeId": 15,
+      "type": "float3"
+    },
+    {
+      "nodeId": 16,
+      "type": "float4"
+    }
+  ],
+  "entryPoints": [
+    {
+      "name": "main",
+      "symbolId": 19,
+      "stage": "Pixel",
+      "profile": "ps_3_0"
+    }
+  ],
+  "techniques": [],
+  "diagnostics": [
+    {
+      "severity": "Error",
+      "id": "HLSL3002",
+      "message": "System-value semantic \u0027SV_TARGET\u0027 is not allowed before SM4.",
+      "span": {
+        "start": 14,
+        "end": 91
+      }
+    },
+    {
+      "severity": "Error",
+      "id": "HLSL3002",
+      "message": "System-value semantic \u0027SV_TARGET\u0027 is not allowed before SM4.",
+      "span": {
+        "start": 14,
+        "end": 91
+      }
+    }
+  ]
+}

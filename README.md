@@ -44,6 +44,7 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
 - Public entry point: `var analyzer = new SemanticAnalyzer(profile: "vs_3_0", entry: "main", inputJson); var output = analyzer.Analyze();`
 - Input JSON should come from `openfxc-hlsl` (do not synthesize ASTs manually). You can call the parser API directly and pass the serialized AST string to the analyzer without writing to disk.
 - CLI wrapper (`src/openfxc-sem/openfxc-sem.csproj`) references the core library and just handles argument parsing and I/O.
+- Output `formatVersion`: `2` (includes `techniques` list for FX files).
 
 ## Build
 - Prereq: initialize the parser submodule: `git submodule update --init --recursive`

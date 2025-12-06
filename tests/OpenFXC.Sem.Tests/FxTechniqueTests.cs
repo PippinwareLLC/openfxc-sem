@@ -68,6 +68,25 @@ technique T {
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL5006");
     }
 
+    [Fact]
+    public void Missing_pixel_when_using_gs_reports_warning()
+    {
+        var source = @"
+float4 main(float4 p : POSITION) : SV_Position { return p; }
+
+technique T {
+    pass P {
+        VertexShader = compile vs_4_0 main();
+        GeometryShader = compile gs_4_0 main();
+    }
+};";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_4_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL5007");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         var astJson = ParseHelper.BuildAstJson(source);

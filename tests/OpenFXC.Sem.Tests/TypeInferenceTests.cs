@@ -233,6 +233,42 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
     }
 
+    [Fact]
+    public void Intrinsic_tex2Dlod_returns_float4()
+    {
+        var source = @"
+sampler2D S;
+float4 main(float2 uv : TEXCOORD0) : SV_Target
+{
+    return tex2Dlod(S, float4(uv, 0, 1));
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_3_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float4");
+    }
+
+    [Fact]
+    public void Intrinsic_tex2Dgrad_returns_float4()
+    {
+        var source = @"
+sampler2D S;
+float4 main(float2 uv : TEXCOORD0) : SV_Target
+{
+    return tex2Dgrad(S, uv, float2(1,0), float2(0,1));
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_3_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float4");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

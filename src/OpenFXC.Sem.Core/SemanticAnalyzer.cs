@@ -244,25 +244,35 @@ internal static class FxModelBuilder
         }
     }
 
-    private static void ValidatePass(FxPassInfo pass, TypeInference inference)
-    {
-        var hasVs = pass.Shaders.Any(s => string.Equals(s.Stage, "Vertex", StringComparison.OrdinalIgnoreCase));
-        var hasPs = pass.Shaders.Any(s => string.Equals(s.Stage, "Pixel", StringComparison.OrdinalIgnoreCase));
-
-        if (!pass.Shaders.Any())
+        private static void ValidatePass(FxPassInfo pass, TypeInference inference)
         {
-            inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
-        }
+            var hasVs = pass.Shaders.Any(s => string.Equals(s.Stage, "Vertex", StringComparison.OrdinalIgnoreCase));
+            var hasPs = pass.Shaders.Any(s => string.Equals(s.Stage, "Pixel", StringComparison.OrdinalIgnoreCase));
+            var hasGs = pass.Shaders.Any(s => string.Equals(s.Stage, "Geometry", StringComparison.OrdinalIgnoreCase));
+            var hasHs = pass.Shaders.Any(s => string.Equals(s.Stage, "Hull", StringComparison.OrdinalIgnoreCase));
+            var hasDs = pass.Shaders.Any(s => string.Equals(s.Stage, "Domain", StringComparison.OrdinalIgnoreCase));
+            var hasCs = pass.Shaders.Any(s => string.Equals(s.Stage, "Compute", StringComparison.OrdinalIgnoreCase));
+
+            if (!pass.Shaders.Any())
+            {
+                inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
+            }
 
         if (hasVs ^ hasPs)
         {
-            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a {(hasVs ? "Pixel" : "Vertex")} shader binding.", pass.Span);
-        }
+                inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a {(hasVs ? "Pixel" : "Vertex")} shader binding.", pass.Span);
+            }
 
-        foreach (var shader in pass.Shaders)
-        {
-            var stageFromProfile = StageFromProfile(shader.Profile);
-            if (!string.IsNullOrWhiteSpace(stageFromProfile) && !string.IsNullOrWhiteSpace(shader.Stage)
+            // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
+            if ((hasGs || hasHs || hasDs || hasCs) && !hasPs)
+            {
+                inference.AddDiagnostic("HLSL5007", $"Pass '{pass.Name}' includes advanced stages but is missing a Pixel shader binding.", pass.Span);
+            }
+
+            foreach (var shader in pass.Shaders)
+            {
+                var stageFromProfile = StageFromProfile(shader.Profile);
+                if (!string.IsNullOrWhiteSpace(stageFromProfile) && !string.IsNullOrWhiteSpace(shader.Stage)
                 && !string.Equals(stageFromProfile, shader.Stage, StringComparison.OrdinalIgnoreCase))
             {
                 inference.AddDiagnostic("HLSL5006", $"Shader '{shader.Stage}' uses profile '{shader.Profile}' (stage '{stageFromProfile}').", pass.Span);
@@ -1029,6 +1039,18 @@ internal static class Intrinsics
         {
             Name = "tex2D",
             Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 3) },
+            ReturnResolver = _ => SemType.Vector("float", 4)
+        },
+        new IntrinsicSignature
+        {
+            Name = "tex2Dlod",
+            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) },
+            ReturnResolver = _ => SemType.Vector("float", 4)
+        },
+        new IntrinsicSignature
+        {
+            Name = "tex2Dgrad",
+            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) },
             ReturnResolver = _ => SemType.Vector("float", 4)
         },
         new IntrinsicSignature

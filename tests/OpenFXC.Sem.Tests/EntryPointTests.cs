@@ -204,6 +204,28 @@ float4 main(float2 uv : TEXCOORD0, float4 c : COLOR0) : COLOR1 { return c; }";
         Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
     }
 
+    [Fact]
+    public void Sm2_pixel_sv_sampleindex_reports_error()
+    {
+        var source = @"
+float4 main(float4 pos : SV_SampleIndex) : COLOR0 { return pos; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
+    [Fact]
+    public void Sm4_pixel_sv_sampleindex_allowed()
+    {
+        var source = @"
+float4 main(uint sample : SV_SampleIndex) : SV_Target { return float4(sample, 0, 0, 1); }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_4_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
     [Theory]
     [InlineData("ps_2_0", true)]
     [InlineData("ps_3_0", true)]
