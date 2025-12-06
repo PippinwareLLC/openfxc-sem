@@ -71,6 +71,7 @@ High-level shape of `output.sem.json`:
 - Convenience: `tests/run-all.cmd` (Windows) or `tests/run-all.sh` (bash)
 - Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests). The suite is scaffolded; expand alongside semantic features per `docs/TDD.md`.
 - Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
+- Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`
@@ -81,8 +82,8 @@ High-level shape of `output.sem.json`:
 
 | Shader Model / Era | Semantics Coverage | Notes |
 | --- | --- | --- |
-| SM1.x (legacy D3D9) | Planned/early | Symbols/types/semantics for legacy samplers/textures and basic expressions; no backend decisions |
-| SM2.x / SM3.x | Planned/early | Parameter/return semantics, sampler/resource symbols, intrinsic resolution for texture math; backend-agnostic |
-| SM4.x | Planned/early | cbuffer/tbuffer symbols, resource types, semantics binding (including SV_*), entry resolution |
-| SM5.x | Planned/early | Structured/RW resources, semantics binding, intrinsics/type inference; backend-agnostic |
-| FX constructs (.fx) | Planned/early | Technique/pass semantics not computed; semantic analysis focuses on shader entry functions |
+| SM1.x (legacy D3D9) | Early | Symbols/types recorded from AST; basic intrinsic/constructor call typing; backend-agnostic |
+| SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; call/binary/swizzle typing; backend-agnostic |
+| SM4.x | Planned | cbuffer/tbuffer symbols and resource types; semantics binding (including SV_*); stronger type inference |
+| SM5.x | Planned | Structured/RW resources; broader intrinsic/type coverage; backend-agnostic |
+| FX constructs (.fx) | Early | Shader entry analysis only; technique/pass semantics not computed |

@@ -150,9 +150,15 @@ internal static class Program
                 using var doc = JsonDocument.Parse(_inputJson);
                 var root = doc.RootElement;
                 rootId = TryGetRootId(root);
-                var build = SymbolBuilder.Build(root, _typeInference);
-                symbols = build.Symbols;
-                types = build.Types;
+                var tokens = TokenLookup.From(root);
+                if (root.TryGetProperty("root", out var rootNodeEl))
+                {
+                    var rootNode = NodeInfo.FromJson(rootNodeEl);
+                    var build = SymbolBuilder.Build(root, _typeInference);
+                    ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
+                    symbols = build.Symbols;
+                    types = build.Types;
+                }
             }
             catch
             {
@@ -700,6 +706,144 @@ internal static class Program
         {
             if (nodeId is null) return null;
             return _nodeTypes.TryGetValue(nodeId.Value, out var t) ? t : null;
+        }
+    }
+
+    private static class ExpressionTypeAnalyzer
+    {
+        public static void Infer(NodeInfo root, TokenLookup tokens, List<SymbolInfo> symbols, List<TypeInfo> types, TypeInference typeInference)
+        {
+            var symbolTypes = symbols
+                .Where(s => !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Type))
+                .GroupBy(s => s.Name!)
+                .ToDictionary(g => g.Key, g => g.First().Type!);
+
+            Traverse(root);
+
+            void Traverse(NodeInfo node)
+            {
+                foreach (var child in node.Children)
+                {
+                    Traverse(child.Node);
+                }
+
+                switch (node.Kind)
+                {
+                    case "Identifier":
+                        {
+                            var name = tokens.GetText(node.Span);
+                            if (name is not null && symbolTypes.TryGetValue(name, out var t))
+                            {
+                                AddType(types, typeInference, node.Id, t);
+                            }
+                        }
+                        break;
+                    case "CallExpression":
+                        {
+                            var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
+                            var calleeName = callee is null ? null : tokens.GetText(callee.Span);
+                            var arguments = node.Children.Where(c => string.Equals(c.Role, "argument", StringComparison.OrdinalIgnoreCase)).Select(c => c.Node).ToList();
+                            var argTypes = arguments.Select(a => typeInference.GetNodeType(a.Id)).ToList();
+
+                            string? inferred = null;
+                            if (!string.IsNullOrWhiteSpace(calleeName))
+                            {
+                                if (IsTypeName(calleeName!))
+                                {
+                                    inferred = calleeName;
+                                }
+                                else if (symbolTypes.TryGetValue(calleeName!, out var fnType))
+                                {
+                                    inferred = ExtractReturnType(fnType);
+                                }
+                                else if (string.Equals(calleeName, "mul", StringComparison.OrdinalIgnoreCase) && argTypes.Count >= 1)
+                                {
+                                    inferred = argTypes.Last() ?? argTypes.First();
+                                }
+                            }
+
+                            AddType(types, typeInference, node.Id, inferred);
+                        }
+                        break;
+                    case "BinaryExpression":
+                        {
+                            var left = node.Children.FirstOrDefault(c => string.Equals(c.Role, "left", StringComparison.OrdinalIgnoreCase)).Node;
+                            var right = node.Children.FirstOrDefault(c => string.Equals(c.Role, "right", StringComparison.OrdinalIgnoreCase)).Node;
+                            var lt = typeInference.GetNodeType(left?.Id);
+                            var rt = typeInference.GetNodeType(right?.Id);
+                            if (!string.IsNullOrWhiteSpace(lt) && string.Equals(lt, rt, StringComparison.OrdinalIgnoreCase))
+                            {
+                                AddType(types, typeInference, node.Id, lt);
+                            }
+                        }
+                        break;
+                    case "MemberAccessExpression":
+                        {
+                            var target = node.Children.FirstOrDefault(c => string.Equals(c.Role, "expression", StringComparison.OrdinalIgnoreCase)).Node;
+                            var baseType = typeInference.GetNodeType(target?.Id);
+                            var text = tokens.GetText(node.Span);
+                            var swizzle = text?.Split('.').LastOrDefault();
+                            var inferred = InferSwizzleType(baseType, swizzle);
+                            AddType(types, typeInference, node.Id, inferred);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        private static void AddType(List<TypeInfo> types, TypeInference typeInference, int? nodeId, string? type)
+        {
+            if (nodeId is null || string.IsNullOrWhiteSpace(type))
+            {
+                return;
+            }
+            if (types.Any(t => t.NodeId == nodeId))
+            {
+                return;
+            }
+            var normalized = typeInference.NormalizeType(type);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return;
+            }
+
+            types.Add(new TypeInfo { NodeId = nodeId, Type = normalized });
+            typeInference.AddNodeType(nodeId, normalized);
+        }
+
+        private static bool IsTypeName(string name)
+        {
+            return name.StartsWith("float", StringComparison.OrdinalIgnoreCase)
+                   || name.StartsWith("int", StringComparison.OrdinalIgnoreCase)
+                   || name.StartsWith("bool", StringComparison.OrdinalIgnoreCase)
+                   || name.StartsWith("matrix", StringComparison.OrdinalIgnoreCase)
+                   || name.StartsWith("half", StringComparison.OrdinalIgnoreCase)
+                   || name.StartsWith("double", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? ExtractReturnType(string fnType)
+        {
+            var idx = fnType.IndexOf('(');
+            return idx > 0 ? fnType[..idx] : fnType;
+        }
+
+        private static string? InferSwizzleType(string? baseType, string? swizzle)
+        {
+            if (string.IsNullOrWhiteSpace(baseType) || string.IsNullOrWhiteSpace(swizzle))
+            {
+                return null;
+            }
+
+            var count = swizzle.Count(ch => "xyzwrgba".Contains(ch, StringComparison.OrdinalIgnoreCase));
+            if (count == 0)
+            {
+                return baseType;
+            }
+
+            var scalar = baseType.TrimEnd('1', '2', '3', '4');
+            return count == 1 ? scalar : $"{scalar}{count}";
         }
     }
 
