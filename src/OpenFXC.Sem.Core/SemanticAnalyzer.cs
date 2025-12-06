@@ -858,6 +858,96 @@ internal static class Intrinsics
             Name = "cross",
             Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
             ReturnResolver = _ => SemType.Vector("float", 3)
+        },
+        new IntrinsicSignature
+        {
+            Name = "min",
+            Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "min",
+            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "min",
+            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "min",
+            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "max",
+            Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "max",
+            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "max",
+            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "max",
+            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "clamp",
+            Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float"), SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "clamp",
+            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "clamp",
+            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "clamp",
+            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "lerp",
+            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "lerp",
+            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "lerp",
+            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
         }
     };
 
@@ -1755,23 +1845,32 @@ internal static class SemanticValidator
                 {
                     inference.AddDiagnostic("HLSL3002", $"Pixel shader return semantic '{semantic.Name}' is not valid for SM{smMajor}. Use COLORn or DEPTH.", span);
                 }
+                if (IsSystemValue(upper))
+                {
+                    inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.", span);
+                }
             }
         }
 
-    private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference, Span? span)
-    {
-        if (param.Semantic is null) return;
-        var name = param.Semantic.Name;
-
-        if (smMajor < 4 && IsSystemValue(name))
+        private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference, Span? span)
         {
-            inference.AddDiagnostic("HLSL3002", $"System-value semantic '{name}' is not allowed before SM4.", span);
-        }
+            if (param.Semantic is null) return;
+            var name = param.Semantic.Name;
 
-        if (stage == "Pixel" && string.Equals(name, "SV_POSITION", StringComparison.OrdinalIgnoreCase))
-        {
-            inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).", span);
-        }
+            if (smMajor < 4 && IsSystemValue(name))
+            {
+                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{name}' is not allowed before SM4.", span);
+            }
+
+            if (smMajor < 4 && stage == "Pixel" && name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase))
+            {
+                inference.AddDiagnostic("HLSL3002", $"Pixel shader parameter semantic '{name}' is not valid for SM{smMajor}. Use legacy TEXCOORD/COLOR semantics.", span);
+            }
+
+            if (stage == "Pixel" && string.Equals(name, "SV_POSITION", StringComparison.OrdinalIgnoreCase))
+            {
+                inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).", span);
+            }
     }
 
     private static bool IsSystemValue(string name) => name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase);

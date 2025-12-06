@@ -95,6 +95,15 @@
         "start": 14,
         "end": 89
       }
+    },
+    {
+      "severity": "Error",
+      "id": "HLSL3002",
+      "message": "System-value semantic \u0027SV_TARGET\u0027 is not allowed before SM4.",
+      "span": {
+        "start": 14,
+        "end": 89
+      }
     }
   ]
 }

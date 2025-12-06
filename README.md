@@ -102,8 +102,8 @@ High-level shape of `output.sem.json`:
 
 | Shader Model / Era | Semantics Coverage | Notes |
 | --- | --- | --- |
-| SM1.x (legacy D3D9) | Early | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape validation with diagnostics; semantics normalized/bound; entryPoints emitted; backend-agnostic |
-| SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; semantics normalized/bound with basic stage/profile guards; entryPoints emitted; backend-agnostic |
+| SM1.x (legacy D3D9) | Early | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape validation with diagnostics; semantics normalized/bound; stage/profile guards on SV/legacy semantics; intrinsics expanded; entryPoints emitted; backend-agnostic |
+| SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; semantics normalized/bound with stage/profile guards (SV blocked pre-SM4 for pixel params/returns); intrinsics expanded; entryPoints emitted; backend-agnostic |
 | SM4.x | In progress | cbuffer symbols/members captured; semantics binding (including SV_*); snapshots included; backend-agnostic |
 | SM5.x | In progress | Structured/RW resources recognized; snapshots included; backend-agnostic |
 | FX constructs (.fx) | Early | Shader entry analysis only; technique/pass semantics not computed (diagnosed as unsupported) |

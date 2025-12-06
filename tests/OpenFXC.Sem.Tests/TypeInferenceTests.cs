@@ -146,6 +146,42 @@ float4 main(float3 a : POSITION0) : COLOR0
         Assert.Contains(types, t => t.GetProperty("type").GetString() == "float");
     }
 
+    [Fact]
+    public void Intrinsic_sin_returns_same_shape()
+    {
+        var source = @"
+float4 main(float2 a : TEXCOORD0) : COLOR0
+{
+    float2 s = sin(a);
+    return float4(s, 0, 0);
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float2");
+    }
+
+    [Fact]
+    public void Intrinsic_clamp_preserves_shape()
+    {
+        var source = @"
+float4 main(float3 a : TEXCOORD0) : COLOR0
+{
+    float3 c = clamp(a, float3(0,0,0), float3(1,1,1));
+    return float4(c, 1);
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float3");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

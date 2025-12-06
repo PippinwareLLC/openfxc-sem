@@ -95,6 +95,17 @@ float4 main(float2 uv : TEXCOORD0) : POSITION { return float4(uv, 0, 1); }";
         Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
     }
 
+    [Fact]
+    public void Sm2_pixel_shader_sv_semantics_report_error()
+    {
+        var source = @"
+float4 main(float4 pos : SV_POSITION) : SV_Target { return pos; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

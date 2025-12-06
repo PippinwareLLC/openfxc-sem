@@ -1,9 +1,9 @@
 # Milestones To Completion (Semantics)
 
-- [ ] **MSC1: SM1.x / SM2.x / SM3.x tightening**
-  - [ ] Tighten semantics validation by stage/profile (legacy vs SV rules) with diagnostics.
-  - [ ] Broaden intrinsic coverage for SM1–3 era builtins/texture ops.
-  - [ ] Add targeted tests locking stage/profile semantic rules and intrinsic behaviors.
+- [x] **MSC1: SM1.x / SM2.x / SM3.x tightening**
+  - [x] Tighten semantics validation by stage/profile (legacy vs SV rules) with diagnostics.
+  - [x] Broaden intrinsic coverage for SM1–3 era builtins/texture ops.
+  - [x] Add targeted tests locking stage/profile semantic rules and intrinsic behaviors.
 
 - [ ] **MSC2: SM4 completion**
   - [ ] Finish semantics binding/validation for all SV_* cases with stage/profile guards.
