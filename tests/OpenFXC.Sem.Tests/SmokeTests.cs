@@ -30,6 +30,9 @@ public class SmokeTests
 
         Assert.True(root.TryGetProperty("entryPoints", out var entryPoints));
         Assert.Equal(JsonValueKind.Array, entryPoints.ValueKind);
+        var firstEntry = entryPoints.EnumerateArray().FirstOrDefault();
+        Assert.False(firstEntry.ValueKind == JsonValueKind.Undefined);
+        Assert.Equal("Vertex", firstEntry.GetProperty("stage").GetString());
 
         Assert.True(root.TryGetProperty("diagnostics", out var diagnostics));
         Assert.Equal(JsonValueKind.Array, diagnostics.ValueKind);

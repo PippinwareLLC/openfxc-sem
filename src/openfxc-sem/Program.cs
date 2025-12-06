@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -145,6 +146,7 @@ internal static class Program
             List<SymbolInfo> symbols = new();
             List<TypeInfo> types = new();
             List<DiagnosticInfo> diagnostics = new();
+            List<EntryPointInfo> entryPoints = new();
 
             try
             {
@@ -157,6 +159,7 @@ internal static class Program
                     var rootNode = NodeInfo.FromJson(rootNodeEl);
                     var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                     ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
+                    entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference);
                     diagnostics.AddRange(_typeInference.Diagnostics);
                     symbols = build.Symbols;
                     types = build.Types;
@@ -177,7 +180,7 @@ internal static class Program
                 Syntax = rootId is null ? null : new SyntaxInfo { RootId = rootId.Value },
                 Symbols = symbols,
                 Types = types,
-                EntryPoints = Array.Empty<EntryPointInfo>(),
+                EntryPoints = entryPoints,
                 Diagnostics = diagnostics
             };
         }
@@ -274,6 +277,7 @@ internal static class Program
             if (node.Id is null) return;
             var name = tokens.GetChildIdentifierText(node, "identifier");
             var returnType = tokens.GetChildTypeText(node, "type") ?? "void";
+            var returnSemantic = ParseSemanticString(tokens.GetAnnotationText(node));
 
             var parameterTypes = new List<string>();
             foreach (var child in node.Children.Where(c => string.Equals(c.Role, "parameter", StringComparison.OrdinalIgnoreCase)))
@@ -304,7 +308,8 @@ internal static class Program
                 Kind = "Function",
                 Name = name,
                 Type = funcType,
-                DeclNodeId = node.Id
+                DeclNodeId = node.Id,
+                ReturnSemantic = returnSemantic
             });
         }
 
@@ -1536,6 +1541,48 @@ internal static class Program
         }
     }
 
+    private static class EntryPointResolver
+    {
+        public static List<EntryPointInfo> Resolve(List<SymbolInfo> symbols, string entryName, string profile, TypeInference inference)
+        {
+            var stage = StageFromProfile(profile);
+            var entry = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(s.Name, entryName, StringComparison.OrdinalIgnoreCase));
+
+            if (entry is null)
+            {
+                inference.AddDiagnostic("HLSL3001", $"No entry point function named '{entryName}' found.");
+                entry = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase));
+                if (entry is null)
+                {
+                    return new List<EntryPointInfo>();
+                }
+            }
+
+            return new List<EntryPointInfo>
+            {
+                new EntryPointInfo
+                {
+                    Name = entry.Name,
+                    SymbolId = entry.Id,
+                    Stage = stage,
+                    Profile = profile
+                }
+            };
+        }
+
+        private static string StageFromProfile(string profile)
+        {
+            if (profile.StartsWith("vs", true, CultureInfo.InvariantCulture)) return "Vertex";
+            if (profile.StartsWith("ps", true, CultureInfo.InvariantCulture)) return "Pixel";
+            if (profile.StartsWith("gs", true, CultureInfo.InvariantCulture)) return "Geometry";
+            if (profile.StartsWith("hs", true, CultureInfo.InvariantCulture)) return "Hull";
+            if (profile.StartsWith("ds", true, CultureInfo.InvariantCulture)) return "Domain";
+            if (profile.StartsWith("cs", true, CultureInfo.InvariantCulture)) return "Compute";
+            return "Unknown";
+        }
+    }
+
     private sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChild> Children)
     {
         public static NodeInfo FromJson(JsonElement element)
@@ -1628,6 +1675,9 @@ internal static class Program
 
         [JsonPropertyName("semantic")]
         public SemanticInfo? Semantic { get; init; }
+
+        [JsonPropertyName("returnSemantic")]
+        public SemanticInfo? ReturnSemantic { get; init; }
     }
 
     private sealed record SemanticInfo
@@ -1648,7 +1698,6 @@ internal static class Program
         public string? Type { get; init; }
     }
 
-    private sealed record EntryPointInfo;
     private sealed record DiagnosticInfo
     {
         [JsonPropertyName("severity")]
