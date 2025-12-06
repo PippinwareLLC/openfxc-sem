@@ -65,6 +65,35 @@ public class SmokeTests
             && s.GetProperty("name").GetString() == "Texture0");
     }
 
+    [Theory]
+    [MemberData(nameof(FxSamplePaths))]
+    public void Analyze_parses_all_dx_sdk_fx_samples(string relativePath)
+    {
+        Console.WriteLine($"Parsing/analyzing: {relativePath}");
+        var semJson = RunParseThenAnalyze(relativePath, profile: "vs_2_0");
+        using var doc = JsonDocument.Parse(semJson);
+        var root = doc.RootElement;
+
+        Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
+        Assert.True(root.GetProperty("symbols").ValueKind == JsonValueKind.Array);
+        Assert.True(root.GetProperty("syntax").GetProperty("rootId").GetInt32() > 0);
+    }
+
+    public static IEnumerable<object[]> FxSamplePaths()
+    {
+        var root = RepoPath("samples", "dxsdk");
+        if (!Directory.Exists(root))
+        {
+            yield break;
+        }
+
+        foreach (var path in Directory.GetFiles(root, "*.fx", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(RepoPath(), path);
+            yield return new object[] { relative };
+        }
+    }
+
     private static string RunParseThenAnalyze(string hlslRelativePath, string profile)
     {
         var repoRoot = RepoPath();
