@@ -130,6 +130,7 @@ internal static class Program
         private readonly string _profile;
         private readonly string _entry;
         private readonly string _inputJson;
+        private readonly TypeInference _typeInference = new();
 
         public SemanticAnalyzer(string profile, string entry, string inputJson)
         {
@@ -149,7 +150,7 @@ internal static class Program
                 using var doc = JsonDocument.Parse(_inputJson);
                 var root = doc.RootElement;
                 rootId = TryGetRootId(root);
-                var build = SymbolBuilder.Build(root);
+                var build = SymbolBuilder.Build(root, _typeInference);
                 symbols = build.Symbols;
                 types = build.Types;
             }
@@ -188,7 +189,7 @@ internal static class Program
 
     private static class SymbolBuilder
     {
-        public static SymbolBuildResult Build(JsonElement root)
+        public static SymbolBuildResult Build(JsonElement root, TypeInference typeInference)
         {
             if (!root.TryGetProperty("root", out var rootNodeEl))
             {
@@ -199,23 +200,23 @@ internal static class Program
             var rootNode = NodeInfo.FromJson(rootNodeEl);
             var symbols = new List<SymbolInfo>();
             var typeCollector = new TypeCollector();
-            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, typeCollector, tokens);
+            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, typeCollector, tokens, typeInference);
             return new SymbolBuildResult(
                 symbols.OrderBy(s => s.Id ?? int.MaxValue).ToList(),
                 typeCollector.ToList());
         }
 
-        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens)
+        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens, TypeInference typeInference)
         {
             switch (node.Kind)
             {
                 case "FunctionDeclaration":
-                    HandleFunction(node, symbols, types, tokens);
+                    HandleFunction(node, symbols, types, tokens, typeInference);
                     currentFunctionId = node.Id;
                     break;
                 case "Parameter":
                     {
-                        var param = BuildParameterSymbol(node, tokens, currentFunctionId, types);
+                        var param = BuildParameterSymbol(node, tokens, currentFunctionId, types, typeInference);
                         if (param is not null)
                         {
                             symbols.Add(param);
@@ -224,7 +225,7 @@ internal static class Program
                     break;
                 case "VariableDeclaration":
                     {
-                        var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens, types);
+                        var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens, types, typeInference);
                         if (variable is not null)
                         {
                             symbols.Add(variable);
@@ -262,11 +263,11 @@ internal static class Program
 
             foreach (var child in node.Children)
             {
-                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, types, tokens);
+                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, types, tokens, typeInference);
             }
         }
 
-        private static void HandleFunction(NodeInfo node, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens)
+        private static void HandleFunction(NodeInfo node, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens, TypeInference typeInference)
         {
             if (node.Id is null) return;
             var name = tokens.GetChildIdentifierText(node, "identifier");
@@ -284,10 +285,14 @@ internal static class Program
 
             var typeNode = GetChildNode(node, "type");
             var typeNodeId = typeNode?.Id ?? node.Id;
-            types.Add(typeNodeId, returnType);
+            var normalizedReturn = typeInference.NormalizeType(returnType);
+            types.Add(typeNodeId, normalizedReturn);
+            typeInference.AddNodeType(typeNodeId, normalizedReturn);
 
             var funcType = BuildFunctionType(returnType, parameterTypes);
-            types.Add(node.Id, funcType);
+            var normalizedFuncType = typeInference.NormalizeFunctionType(normalizedReturn, parameterTypes);
+            types.Add(node.Id, normalizedFuncType);
+            typeInference.AddNodeType(node.Id, normalizedFuncType);
 
             symbols.Add(new SymbolInfo
             {
@@ -299,7 +304,7 @@ internal static class Program
             });
         }
 
-        private static SymbolInfo? BuildParameterSymbol(NodeInfo node, TokenLookup tokens, int? parentSymbolId, TypeCollector types)
+        private static SymbolInfo? BuildParameterSymbol(NodeInfo node, TokenLookup tokens, int? parentSymbolId, TypeCollector types, TypeInference typeInference)
         {
             if (node.Id is null) return null;
             var name = tokens.GetChildIdentifierText(node, "identifier");
@@ -319,7 +324,9 @@ internal static class Program
 
             var typeNode = GetChildNode(node, "type");
             var typeNodeId = typeNode?.Id ?? node.Id;
-            types.Add(typeNodeId, type);
+            var normalizedType = typeInference.NormalizeType(type);
+            types.Add(typeNodeId, normalizedType);
+            typeInference.AddNodeType(typeNodeId, normalizedType);
 
             return new SymbolInfo
             {
@@ -333,7 +340,7 @@ internal static class Program
             };
         }
 
-        private static SymbolInfo? BuildVariableSymbol(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, TokenLookup tokens, TypeCollector types)
+        private static SymbolInfo? BuildVariableSymbol(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, TokenLookup tokens, TypeCollector types, TypeInference typeInference)
         {
             if (node.Id is null) return null;
 
@@ -353,7 +360,9 @@ internal static class Program
 
             var typeNode = GetChildNode(node, "type");
             var typeNodeId = typeNode?.Id ?? node.Id;
-            types.Add(typeNodeId, type);
+            var normalizedType = typeInference.NormalizeType(type);
+            types.Add(typeNodeId, normalizedType);
+            typeInference.AddNodeType(typeNodeId, normalizedType);
 
             return new SymbolInfo
             {
@@ -648,6 +657,49 @@ internal static class Program
                 .OrderBy(kv => kv.Key)
                 .Select(kv => new TypeInfo { NodeId = kv.Key, Type = kv.Value })
                 .ToList();
+        }
+    }
+
+    private sealed class TypeInference
+    {
+        private readonly Dictionary<int, string> _nodeTypes = new();
+
+        public string? NormalizeType(string? type)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+            {
+                return null;
+            }
+
+            return type.Trim();
+        }
+
+        public string NormalizeFunctionType(string returnType, IReadOnlyList<string> parameters)
+        {
+            var normalizedReturn = NormalizeType(returnType) ?? "void";
+            var normalizedParams = parameters.Select(p => NormalizeType(p) ?? "void");
+            return $"{normalizedReturn}({string.Join(", ", normalizedParams)})";
+        }
+
+        public void AddNodeType(int? nodeId, string? type)
+        {
+            if (nodeId is null || string.IsNullOrWhiteSpace(type))
+            {
+                return;
+            }
+
+            if (_nodeTypes.ContainsKey(nodeId.Value))
+            {
+                return;
+            }
+
+            _nodeTypes[nodeId.Value] = type!;
+        }
+
+        public string? GetNodeType(int? nodeId)
+        {
+            if (nodeId is null) return null;
+            return _nodeTypes.TryGetValue(nodeId.Value, out var t) ? t : null;
         }
     }
 
