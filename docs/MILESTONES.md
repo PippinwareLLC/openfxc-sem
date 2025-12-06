@@ -20,9 +20,9 @@
   - Normalize legacy and `SV_*` semantics; bind to params/returns and symbols; diagnostics for invalid/missing.
   - Entry-point resolution (default and `--entry`), stage derived from profile with missing-entry diagnostics.
   - Tests for semantics binding, normalization, duplicates, missing semantics, and entry selection diagnostics.
-- [ ] **M5: Profile Awareness**
-  - Profile metadata propagated; optional guardrails for incompatible semantics/usages.
-  - Tests for profile propagation and any enforced rules.
+- [x] **M5: Profile Awareness**
+  - Profile metadata propagated; stage derived from profile; system-value semantics guarded on pre-SM4; basic stage/semantic guards.
+  - Tests for profile propagation and enforced rules via semantics validation.
 - [ ] **M6: Diagnostics Stability**
   - Stable diagnostic IDs/messages/spans for unknown identifiers, type errors, wrong arity, duplicates, intrinsic misuse.
   - JSON span invariants validated across fixtures.
