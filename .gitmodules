@@ -1,0 +1,3 @@
+[submodule "openfxc-hlsl"]
+	path = openfxc-hlsl
+	url = https://github.com/PippinwareLLC/openfxc-hlsl.git
