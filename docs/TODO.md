@@ -33,30 +33,30 @@
 - [x] Implement intrinsic table (initial set: mul, dot, normalize, saturate, tex2D).
 - [x] Type-check intrinsic calls, enforce argument counts, and choose result types deterministically.
 - [x] Tests: correct usages per intrinsic plus negative misuse (bad arity/types).
-- [ ] Extend coverage to more intrinsics and texture variants (SM3+/SM4+), including SM4/SM5 resource overloads.
+- [x] Extend coverage to more intrinsics and texture variants (SM3+/SM4+), including SM4/SM5 resource overloads.
 
 ## Semantics and Entry Points
-- [ ] Normalize legacy semantics (POSITION0, COLOR0) and SV_* forms; associate indices where present, validate against stage/profile. (Basic uppercasing and SM4 system-value guards done; broaden validation/index handling, legacy vs SV compatibility per stage/profile.)
+- [x] Normalize legacy semantics (POSITION0, COLOR0) and SV_* forms; associate indices where present, validate against stage/profile.
 - [x] Bind parameter/return semantics and record in symbols/types; uppercase normalization applied.
 - [x] Entry resolution: default main or --entry, stage derived from profile (with diagnostic when missing).
-- [ ] Tests: parameter/return semantics validation, SV targets, entry selection/ambiguity, missing/invalid semantics diagnostics. (Initial coverage for normalization, missing/duplicate semantics, missing entry; expand stage/profile cases across SM1-SM5.)
-- [ ] FX constructs: either compute technique/pass semantics or document/diagnose non-support; add tests to lock behavior.
+- [x] Tests: parameter/return semantics validation, SV targets, entry selection/ambiguity, missing/invalid semantics diagnostics (coverage added for stage/profile SV guards and FX diagnostics).
+- [x] FX constructs: either compute technique/pass semantics or document/diagnose non-support; add tests to lock behavior (diagnose unsupported).
 
 ## Profile Awareness
 - [x] Carry profile metadata through analysis for entry-point stage mapping.
-- [ ] Optional guards for profile/semantic mismatches (e.g., SV semantics under SM2-only, stage-semantic compatibility).
+- [x] Optional guards for profile/semantic mismatches (e.g., SV semantics under SM2-only, stage-semantic compatibility).
 - [ ] Tests: profile propagation and enforced guardrails across SM1-SM5.
 
 ## Diagnostics
 - [x] Unknown identifier, type mismatch, wrong argument count, duplicate symbol, intrinsic misuse.
 - [x] JSON span stability (0 <= start <= end <= length) across all diagnostics and semantic bindings.
-- [ ] Tests: targeted negative cases and snapshot stability.
+- [x] Tests: targeted negative cases and snapshot stability.
 
 ## Integration and Snapshots
-- [ ] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer, SM5 structured/RW resource cases). (Snapshots added for SM2 VS/PS, SM4 cbuffer, SM5 structured buffer.)
+- [x] Golden semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer, SM5 structured/RW resource cases).
 - [x] Integration path: `openfxc-hlsl parse` -> `openfxc-sem analyze` smoke runs for SM1-SM5 (DXSDK sweep gated; full sweep via env opt-in).
 - [x] CLI smoke tests for stdin/file IO and required options (--profile, --entry).
-- [ ] Source fixtures from samples/ in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
+- [x] Source fixtures from samples/ in this repo; generate AST JSON via the `openfxc-hlsl` submodule to feed semantic tests.
 - [x] Compatibility matrix kept in sync with snapshot coverage and SM-era feature completion.
 
 ## Tooling and CI
@@ -64,4 +64,4 @@
 - [x] Update README and docs as surfaces evolve; keep TODO/MILESTONES in sync with progress.
 - [x] Add devlog entries for significant changes and test runs.
 - [x] Release checklist added (`docs/RELEASE_CHECKLIST.md`).
-- [ ] Add build/use docs for the new semantic core library (namespace/API sample) and ensure CLI references it.
+- [x] Add build/use docs for the new semantic core library (namespace/API sample) and ensure CLI references it.

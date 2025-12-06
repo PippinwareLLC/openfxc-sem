@@ -20,6 +20,6 @@
   - [x] Decide on technique/pass semantics: implement or explicitly diagnose/disable.
   - [x] Document stance and add tests to lock behavior.
 
-- [ ] **MSC5: Docs & test backstops**
-  - [ ] Update compatibility matrix, TODO, dev logs as milestones close.
-  - [ ] Ensure tests cover profile/semantic guardrails and intrinsic/resource matrices before marking complete.
+- [x] **MSC5: Docs & test backstops**
+  - [x] Update compatibility matrix, TODO, dev logs as milestones close.
+  - [x] Ensure tests cover profile/semantic guardrails and intrinsic/resource matrices before marking complete.
