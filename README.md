@@ -102,8 +102,8 @@ High-level shape of `output.sem.json`:
 
 | Shader Model / Era | Semantics Coverage | Notes |
 | --- | --- | --- |
-| SM1.x (legacy D3D9) | Early | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape validation with diagnostics; semantics normalized/bound; stage/profile guards on SV/legacy semantics; intrinsics expanded; entryPoints emitted; backend-agnostic |
-| SM2.x / SM3.x | Early | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; semantics normalized/bound with stage/profile guards (SV blocked pre-SM4 for pixel params/returns); intrinsics expanded; entryPoints emitted; backend-agnostic |
+| SM1.x (legacy D3D9) | Complete | Symbols/types recorded; structured SemType model for swizzles/binaries/indexing; constructor arity/shape validation with diagnostics; semantics normalized/bound with stage/profile guards on SV/legacy semantics; intrinsics expanded (sin/cos/abs/length/cross/min/max/clamp/lerp/tex2D variants); snapshots/negatives; entryPoints emitted; backend-agnostic |
+| SM2.x / SM3.x | Complete | Symbols/types/semantics for params/globals/resources; structured typing for expressions; constructor/binary mismatch negatives covered; semantics normalized/bound with stage/profile guards (SV blocked pre-SM4 for VS/PS params/returns); intrinsics expanded (including tex2D projected); snapshots/negatives; entryPoints emitted; backend-agnostic |
 | SM4.x | Complete | cbuffer symbols/members captured; semantics binding/validation for SV_* with stage/profile guards; SM4 intrinsics/resources covered; snapshots included; backend-agnostic |
 | SM5.x | Complete | Structured/RW resources recognized with symbols/types; SM5 semantics/intrinsics/resource coverage locked by snapshots/tests; backend-agnostic |
 | FX constructs (.fx) | Complete | Shader entry analysis only; technique/pass semantics diagnosed as unsupported |

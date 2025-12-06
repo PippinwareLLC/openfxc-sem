@@ -1709,15 +1709,17 @@ internal static class ExpressionTypeAnalyzer
             }
     }
 
-    private static int CountComponents(SemType type) =>
-        type.Kind switch
-        {
-            TypeKind.Scalar => 1,
-            TypeKind.Vector => type.VectorSize,
-            TypeKind.Matrix => type.Rows * type.Columns,
-            TypeKind.Array when type.ElementType is not null && type.ArrayLength.HasValue => type.ElementType.Kind == TypeKind.Scalar ? type.ArrayLength.Value : type.ArrayLength.Value * CountComponents(type.ElementType),
-            _ => 1
-        };
+    private static int CountComponents(SemType? type) =>
+        type is null
+            ? 0
+            : type.Kind switch
+            {
+                TypeKind.Scalar => 1,
+                TypeKind.Vector => type.VectorSize,
+                TypeKind.Matrix => type.Rows * type.Columns,
+                TypeKind.Array when type.ElementType is not null && type.ArrayLength.HasValue => type.ElementType.Kind == TypeKind.Scalar ? type.ArrayLength.Value : type.ArrayLength.Value * CountComponents(type.ElementType),
+                _ => 1
+            };
 
     private static void InferBinary(NodeInfo node, TypeInference typeInference, List<TypeInfo> types)
     {
