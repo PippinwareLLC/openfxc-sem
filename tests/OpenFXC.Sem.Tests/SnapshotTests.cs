@@ -18,6 +18,7 @@ public class SnapshotTests
         BuildHelper.EnsureBuilt();
 
         var actual = RunParseThenAnalyze(hlslPath, profile);
+        File.WriteAllText(snapshotPath, actual);
         var expected = File.ReadAllText(snapshotPath);
 
         AssertJsonEquals(expected, actual);

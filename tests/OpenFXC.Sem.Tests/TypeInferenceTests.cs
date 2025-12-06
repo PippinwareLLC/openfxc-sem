@@ -110,6 +110,42 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
         Assert.Contains(types, t => t.GetProperty("type").GetString() == "float4");
     }
 
+    [Fact]
+    public void Intrinsic_cross_returns_vector3()
+    {
+        var source = @"
+float4 main(float3 a : POSITION0, float3 b : NORMAL0) : COLOR0
+{
+    float3 c = cross(a, b);
+        return float4(c, 1.0f);
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float3");
+    }
+
+    [Fact]
+    public void Intrinsic_length_returns_scalar()
+    {
+        var source = @"
+float4 main(float3 a : POSITION0) : COLOR0
+{
+    float len = length(a);
+    return float4(len, len, len, 1);
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+
+        var types = doc.RootElement.GetProperty("types").EnumerateArray().ToList();
+        Assert.Contains(types, t => t.GetProperty("type").GetString() == "float");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();

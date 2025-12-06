@@ -762,6 +762,102 @@ internal static class Intrinsics
             Name = "tex2D",
             Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2) },
             ReturnResolver = _ => SemType.Vector("float", 4)
+        },
+        new IntrinsicSignature
+        {
+            Name = "sin",
+            Parameters = new [] { SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "sin",
+            Parameters = new [] { SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "sin",
+            Parameters = new [] { SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "sin",
+            Parameters = new [] { SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "cos",
+            Parameters = new [] { SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "cos",
+            Parameters = new [] { SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "cos",
+            Parameters = new [] { SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "cos",
+            Parameters = new [] { SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "abs",
+            Parameters = new [] { SemType.Scalar("float") },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "abs",
+            Parameters = new [] { SemType.Vector("float", 2) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "abs",
+            Parameters = new [] { SemType.Vector("float", 3) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "abs",
+            Parameters = new [] { SemType.Vector("float", 4) },
+            ReturnResolver = args => args.FirstOrDefault()
+        },
+        new IntrinsicSignature
+        {
+            Name = "length",
+            Parameters = new [] { SemType.Vector("float", 2) },
+            ReturnResolver = _ => SemType.Scalar("float")
+        },
+        new IntrinsicSignature
+        {
+            Name = "length",
+            Parameters = new [] { SemType.Vector("float", 3) },
+            ReturnResolver = _ => SemType.Scalar("float")
+        },
+        new IntrinsicSignature
+        {
+            Name = "length",
+            Parameters = new [] { SemType.Vector("float", 4) },
+            ReturnResolver = _ => SemType.Scalar("float")
+        },
+        new IntrinsicSignature
+        {
+            Name = "cross",
+            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
+            ReturnResolver = _ => SemType.Vector("float", 3)
         }
     };
 
@@ -826,6 +922,9 @@ internal static class Intrinsics
 
         return b.Kind == TypeKind.Vector ? b : a;
     }
+
+    public static bool IsIntrinsic(string name) =>
+        Catalog.Any(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
 }
 
 internal sealed record SemType
@@ -1288,6 +1387,10 @@ internal static class ExpressionTypeAnalyzer
                         {
                             AddType(types, typeInference, node.Id, t);
                         }
+                        else if (name is not null && (Intrinsics.IsIntrinsic(name) || IsTypeName(name)))
+                        {
+                            // Intrinsic or type name will be handled by call/constructor inference; suppress unknown-id diagnostic here.
+                        }
                         else
                         {
                             typeInference.AddDiagnostic("HLSL2005", $"Unknown identifier '{name ?? "<unknown>"}'.", node.Span);
@@ -1394,25 +1497,36 @@ internal static class ExpressionTypeAnalyzer
         }
     }
 
-    private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span)
-    {
-        if (args.Count == 0) return;
-
-        if (targetType.Kind is TypeKind.Vector or TypeKind.Matrix)
+        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span)
         {
-            var required = targetType.Kind == TypeKind.Vector
-                ? targetType.VectorSize
-                : targetType.Rows * targetType.Columns;
+            if (args.Count == 0) return;
 
-            var provided = 0;
-            foreach (var arg in args)
+            static bool ArgCompatible(SemType? arg, string baseType)
             {
-                if (arg is null || !TypeCompatibility.CanPromote(arg, SemType.Scalar(targetType.BaseType)))
+                if (arg is null) return false;
+                return arg.Kind switch
                 {
-                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
-                    return;
-                }
-                provided += CountComponents(arg);
+                    TypeKind.Scalar => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType)),
+                    TypeKind.Vector or TypeKind.Matrix => string.Equals(arg.BaseType, baseType, StringComparison.OrdinalIgnoreCase),
+                    _ => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType))
+                };
+            }
+
+            if (targetType.Kind is TypeKind.Vector or TypeKind.Matrix)
+            {
+                var required = targetType.Kind == TypeKind.Vector
+                    ? targetType.VectorSize
+                    : targetType.Rows * targetType.Columns;
+
+                var provided = 0;
+                foreach (var arg in args)
+                {
+                    if (!ArgCompatible(arg, targetType.BaseType))
+                    {
+                        typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                        return;
+                    }
+                    provided += CountComponents(arg);
             }
 
             if (provided != required)
@@ -1420,16 +1534,16 @@ internal static class ExpressionTypeAnalyzer
                 typeInference.AddDiagnostic("HLSL2001", $"Constructor '{calleeName}' expects {required} components but got {provided}.", span);
             }
             return;
-        }
-
-        foreach (var arg in args)
-        {
-            if (arg is null || !TypeCompatibility.CanPromote(arg, targetType))
-            {
-                typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
-                return;
             }
-        }
+
+            foreach (var arg in args)
+            {
+                if (!ArgCompatible(arg, targetType.BaseType))
+                {
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                    return;
+                }
+            }
     }
 
     private static int CountComponents(SemType type) =>
@@ -1621,18 +1735,28 @@ internal static class SemanticValidator
         }
     }
 
-    private static void ValidateReturnSemantic(SemanticInfo? semantic, string stage, int smMajor, TypeInference inference, Span? span)
-    {
-        if (semantic is null) return;
-        if (smMajor < 4 && IsSystemValue(semantic.Name))
+        private static void ValidateReturnSemantic(SemanticInfo? semantic, string stage, int smMajor, TypeInference inference, Span? span)
         {
-            inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.", span);
+            if (semantic is null) return;
+            if (smMajor < 4 && IsSystemValue(semantic.Name))
+            {
+                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.", span);
+            }
+            if (stage == "Vertex" && string.Equals(semantic.Name, "SV_TARGET", StringComparison.OrdinalIgnoreCase))
+            {
+                inference.AddDiagnostic("HLSL3002", "Vertex shaders cannot return SV_TARGET.", span);
+            }
+            if (stage == "Pixel" && smMajor < 4)
+            {
+                var upper = semantic.Name.ToUpperInvariant();
+                var isColor = upper.StartsWith("COLOR", StringComparison.OrdinalIgnoreCase);
+                var isDepth = string.Equals(upper, "DEPTH", StringComparison.OrdinalIgnoreCase);
+                if (!isColor && !isDepth && !IsSystemValue(upper))
+                {
+                    inference.AddDiagnostic("HLSL3002", $"Pixel shader return semantic '{semantic.Name}' is not valid for SM{smMajor}. Use COLORn or DEPTH.", span);
+                }
+            }
         }
-        if (stage == "Vertex" && string.Equals(semantic.Name, "SV_TARGET", StringComparison.OrdinalIgnoreCase))
-        {
-            inference.AddDiagnostic("HLSL3002", "Vertex shaders cannot return SV_TARGET.", span);
-        }
-    }
 
     private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference, Span? span)
     {

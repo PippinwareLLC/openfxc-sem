@@ -84,6 +84,17 @@ float4 main(float4 a, float4 b : POSITION0) : SV_Position { return a + b; }";
         Assert.True(span.GetProperty("end").GetInt32() >= span.GetProperty("start").GetInt32());
     }
 
+    [Fact]
+    public void Pixel_shader_invalid_legacy_semantic_reports_error()
+    {
+        var source = @"
+float4 main(float2 uv : TEXCOORD0) : POSITION { return float4(uv, 0, 1); }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();
