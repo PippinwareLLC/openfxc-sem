@@ -45,6 +45,17 @@ float4 main(float4 pos : position0) : sv_target { return pos; }";
         Assert.Equal("POSITION", param.GetProperty("semantic").GetProperty("name").GetString());
     }
 
+    [Fact]
+    public void System_value_semantics_blocked_before_sm4()
+    {
+        var source = @"
+float4 main(float4 pos : POSITION0) : SV_Target { return pos; }";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
+        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
+        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         var hlslPath = Path.Combine(Path.GetTempPath(), $"openfxc-sem-inline-{Guid.NewGuid():N}.hlsl");

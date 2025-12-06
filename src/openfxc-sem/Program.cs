@@ -160,6 +160,7 @@ internal static class Program
                     var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                     ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
                     entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference);
+                    SemanticValidator.Validate(build.Symbols, entryPoints, _profile, _typeInference);
                     diagnostics.AddRange(_typeInference.Diagnostics);
                     symbols = build.Symbols;
                     types = build.Types;
@@ -1585,6 +1586,70 @@ internal static class Program
             if (profile.StartsWith("ds", true, CultureInfo.InvariantCulture)) return "Domain";
             if (profile.StartsWith("cs", true, CultureInfo.InvariantCulture)) return "Compute";
             return "Unknown";
+        }
+    }
+
+    private static class SemanticValidator
+    {
+        public static void Validate(List<SymbolInfo> symbols, List<EntryPointInfo> entryPoints, string profile, TypeInference inference)
+        {
+            if (entryPoints.Count == 0) return;
+
+            var entry = entryPoints[0];
+            var stage = entry.Stage ?? "Unknown";
+            var smMajor = ParseProfileMajor(profile);
+
+            var function = symbols.FirstOrDefault(s => s.Id == entry.SymbolId);
+            if (function is not null)
+            {
+                ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference);
+            }
+
+            foreach (var param in symbols.Where(s => s.ParentSymbolId == entry.SymbolId && string.Equals(s.Kind, "Parameter", StringComparison.OrdinalIgnoreCase)))
+            {
+                ValidateParameterSemantic(param, stage, smMajor, inference);
+            }
+        }
+
+        private static void ValidateReturnSemantic(SemanticInfo? semantic, string stage, int smMajor, TypeInference inference)
+        {
+            if (semantic is null) return;
+            if (smMajor < 4 && IsSystemValue(semantic.Name))
+            {
+                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.");
+            }
+            if (stage == "Vertex" && string.Equals(semantic.Name, "SV_TARGET", StringComparison.OrdinalIgnoreCase))
+            {
+                inference.AddDiagnostic("HLSL3002", "Vertex shaders cannot return SV_TARGET.");
+            }
+        }
+
+        private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference)
+        {
+            if (param.Semantic is null) return;
+            var name = param.Semantic.Name;
+
+            if (smMajor < 4 && IsSystemValue(name))
+            {
+                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{name}' is not allowed before SM4.");
+            }
+
+            if (stage == "Pixel" && string.Equals(name, "SV_POSITION", StringComparison.OrdinalIgnoreCase))
+            {
+                inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).");
+            }
+        }
+
+        private static bool IsSystemValue(string name) => name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase);
+
+        private static int ParseProfileMajor(string profile)
+        {
+            var parts = profile.Split('_');
+            if (parts.Length >= 2 && int.TryParse(parts[1].Split('.')[0], out var major))
+            {
+                return major;
+            }
+            return 0;
         }
     }
 
