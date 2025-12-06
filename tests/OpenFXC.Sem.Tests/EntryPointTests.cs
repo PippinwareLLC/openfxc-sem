@@ -1,8 +1,9 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Xunit;
+using OpenFXC.Sem;
 
 namespace OpenFXC.Sem.Tests;
 
@@ -85,54 +86,14 @@ float4 main(float4 a, float4 b : POSITION0) : SV_Position { return a + b; }";
 
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
-        var hlslPath = Path.Combine(Path.GetTempPath(), $"openfxc-sem-inline-{Guid.NewGuid():N}.hlsl");
-        File.WriteAllText(hlslPath, source);
-
         BuildHelper.EnsureBuilt();
-
-        try
+        var astJson = ParseHelper.BuildAstJson(source, "inline.hlsl");
+        var analyzer = new SemanticAnalyzer(profile, "main", astJson);
+        var output = analyzer.Analyze();
+        return JsonSerializer.Serialize(output, new JsonSerializerOptions
         {
-        var astJson = ParseHelper.BuildAstJsonFromPath(hlslPath);
-
-            var semPsi = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = $"run --no-build --project \"{RepoPath("src", "openfxc-sem", "openfxc-sem.csproj")}\" analyze --profile {profile}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                RedirectStandardInput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var semProc = Process.Start(semPsi) ?? throw new InvalidOperationException("Failed to start openfxc-sem analyze.");
-            semProc.StandardInput.Write(astJson);
-            semProc.StandardInput.Close();
-            var semOut = semProc.StandardOutput.ReadToEnd();
-            var semErr = semProc.StandardError.ReadToEnd();
-            semProc.WaitForExit();
-            if (semProc.ExitCode != 0)
-            {
-                throw new InvalidOperationException($"openfxc-sem analyze failed with {semProc.ExitCode}. stderr: {semErr}");
-            }
-
-            return semOut;
-        }
-        finally
-        {
-            if (File.Exists(hlslPath))
-            {
-                File.Delete(hlslPath);
-            }
-        }
-    }
-
-    private static string RepoPath(params string[] parts)
-    {
-        var baseDir = AppContext.BaseDirectory;
-        var repoRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", ".."));
-        return parts.Length == 0
-            ? repoRoot
-            : Path.Combine(new[] { repoRoot }.Concat(parts).ToArray());
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        });
     }
 }

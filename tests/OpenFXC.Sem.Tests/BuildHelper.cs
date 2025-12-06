@@ -15,8 +15,8 @@ internal static class BuildHelper
         lock (_lock)
         {
             if (_built) return;
-            BuildProject(RepoPath("openfxc-hlsl", "src", "openfxc-hlsl", "openfxc-hlsl.csproj"));
-            BuildProject(RepoPath("src", "openfxc-sem", "openfxc-sem.csproj"));
+            BuildProject(RepoPath("openfxc-hlsl", "src", "OpenFXC.Hlsl", "OpenFXC.Hlsl.csproj"));
+            BuildProject(RepoPath("src", "OpenFXC.Sem.Core", "OpenFXC.Sem.Core.csproj"));
             _built = true;
         }
     }

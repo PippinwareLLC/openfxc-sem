@@ -13,7 +13,7 @@
 - [x] Add a public entry point in the core (e.g., `SemanticAnalyzer.Analyze()` instance method; optional `SemanticApi` static wrapper if desired).
 - [x] Add ProjectReference from CLI to core; remove analyzer code from CLI project.
 - [x] Refactor CLI `Program.cs` to thin wrapper: parse args, read input, instantiate SemanticAnalyzer, serialize output.
-- [ ] Update tests to build core once and reference the library; ensure no CLI duplication.
+- [x] Update tests to build core once and reference the library; ensure no CLI duplication.
 - [x] Update README with library usage (namespace/API sample) and build instructions reflecting the split.
 - [ ] Add devlog entry and mark TODO/MILESTONES complete when done.
 

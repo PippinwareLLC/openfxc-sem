@@ -1,10 +1,11 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Xunit;
+using OpenFXC.Sem;
 
 namespace OpenFXC.Sem.Tests;
 
@@ -56,27 +57,13 @@ public class SnapshotTests
     private static string RunParseThenAnalyze(string hlslPath, string profile)
     {
         var astJson = ParseHelper.BuildAstJsonFromPath(hlslPath);
-
-        var semPsi = new ProcessStartInfo
+        var analyzer = new SemanticAnalyzer(profile, "main", astJson);
+        var output = analyzer.Analyze();
+        return JsonSerializer.Serialize(output, new JsonSerializerOptions
         {
-            FileName = "dotnet",
-            Arguments = $"run --no-build --project \"{RepoPath("src", "openfxc-sem", "openfxc-sem.csproj")}\" analyze --profile {profile}",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var semProc = Process.Start(semPsi) ?? throw new InvalidOperationException("Failed to start openfxc-sem analyze.");
-        semProc.StandardInput.Write(astJson);
-        semProc.StandardInput.Close();
-        var semOut = semProc.StandardOutput.ReadToEnd();
-        var semErr = semProc.StandardError.ReadToEnd();
-        semProc.WaitForExit();
-        Assert.True(semProc.ExitCode == 0, $"openfxc-sem analyze failed with {semProc.ExitCode}. stderr: {semErr}");
-
-        return semOut;
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        });
     }
 
     private static void AssertJsonEquals(string expected, string actual)
