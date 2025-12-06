@@ -1,0 +1,38 @@
+# Milestones
+
+- [ ] **M0: Bootstrap**
+  - CLI skeleton for `openfxc-sem analyze` with stdin/file IO and JSON output per `docs/TDD.md`.
+  - Semantic JSON schema drafted and sample outputs captured.
+  - Basic smoke run wiring.
+- [ ] **M1: Symbol Table Baseline**
+  - Collect globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
+  - Parent-child relationships and declaration node links recorded.
+  - Unit tests for symbol presence across simple shaders.
+- [ ] **M2: Type Inference Core**
+  - Scalars/vectors/matrices/arrays/resources and function signatures represented.
+  - Expression inference for arithmetic, swizzles, indexing, constructors, casts.
+  - Positive/negative inference tests with diagnostics.
+- [ ] **M3: Intrinsic Resolution**
+  - Intrinsic catalog (mul/dot/normalize/saturate/tex2D/etc.) with deterministic signatures.
+  - Arity/type checking with diagnostics on misuse.
+  - Intrinsic-focused unit and negative tests.
+- [ ] **M4: Semantics and Entry Points**
+  - Normalize legacy and `SV_*` semantics; bind to params/returns and symbols.
+  - Entry-point resolution (default and `--entry`), stage derived from profile.
+  - Tests for semantics binding and entry selection/missing-entry diagnostics.
+- [ ] **M5: Profile Awareness**
+  - Profile metadata propagated; optional guardrails for incompatible semantics/usages.
+  - Tests for profile propagation and any enforced rules.
+- [ ] **M6: Diagnostics Stability**
+  - Stable diagnostic IDs/messages/spans for unknown identifiers, type errors, wrong arity, duplicates, intrinsic misuse.
+  - JSON span invariants validated across fixtures.
+- [ ] **M7: Snapshots and Integration**
+  - Semantic JSON snapshots for representative shaders (VS passthrough, texture PS, SM4/5 cbuffer).
+  - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` across SM1–SM5.
+  - CLI smoke for stdin/file IO and option handling.
+- [ ] **M8: Tooling and CI**
+  - Consolidated test runner (`tests/run-all.*`) for unit/negative/snapshot/CLI smoke suites.
+  - Docs/README kept in sync; devlogs recorded; release checklist established.
+- [ ] **M9: Release Readiness (Semantic Parity)**
+  - Semantic coverage per `docs/TDD.md` across SM1–SM5; no known crashers; stable outputs.
+  - Compatibility notes and regression suite locked.

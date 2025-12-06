@@ -6,6 +6,11 @@ The semantic analyzer stage for OpenFXC. It consumes the JSON AST produced by `o
 - Goals: accept SM1-SM5 era HLSL/FX, produce a semantic model plus diagnostics without crashing (partial models are allowed when errors exist).
 - Non-goals: IR/DXBC generation, optimization, full profile legalization, or preprocessor evaluation beyond what is represented in the AST.
 
+## Architectural Boundary
+- `openfxc-sem` is backend-agnostic: no DX9/DXBC opcode/register decisions, packing rules, or hardware limits.
+- Downstream passes handle legalization and lowering (e.g., profile checks, DX9 instruction selection, DXBC emission).
+- Semantic analysis focuses solely on HLSL meaning: symbols, types, semantics, intrinsic resolution, and entry discovery.
+
 ## CLI
 ```
 openfxc-sem analyze [options] < input.ast.json > output.sem.json
@@ -47,13 +52,12 @@ High-level shape of `output.sem.json`:
 - Profile-aware cases across SM1-SM5 expectations.
 - Integration smoke: `openfxc-hlsl parse` -> `openfxc-sem analyze` on representative shaders (passthrough VS, texture PS, SM4/5 cbuffer examples).
 
-## Definition of Done (initial)
-- CLI contract honored with required `--profile` and optional `--entry`.
-- Symbols cover all declaration kinds; types cover expressions and declarations.
-- Intrinsic resolution and semantics binding implemented with diagnostics.
-- Entry point resolution works and is recorded in the output.
-- Diagnostics are stable (IDs like `HLSL2xxx`) and emitted instead of crashing.
-- Interoperates cleanly with `openfxc-hlsl` JSON outputs.
+## Testing (commands)
+- Run all tests: `dotnet test tests/OpenFXC.Sem.Tests/OpenFXC.Sem.Tests.csproj`
+- Convenience: `tests/run-all.cmd` (Windows) or `tests/run-all.sh` (bash)
+- Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests). The suite is scaffolded; expand alongside semantic features per `docs/TDD.md`.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`
+- Work queue: `docs/TODO.md`
+- Milestones: `docs/MILESTONES.md`
