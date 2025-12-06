@@ -1,6 +1,9 @@
 # openfxc-sem
 The semantic analyzer stage for OpenFXC. It consumes the JSON AST produced by `openfxc-hlsl`, builds a semantic model (symbols, types, semantics), and emits JSON ready for IR lowering.
 
+## Origin
+openfxc-sem is a distilled standalone CLI tool peeled from the larger (currently private) OpenFXC project.
+
 ## Overview
 - Pipeline: `openfxc-hlsl parse` -> `openfxc-sem analyze` -> IR lowering.
 - Goals: accept SM1-SM5 era HLSL/FX, produce a semantic model plus diagnostics without crashing (partial models are allowed when errors exist).
@@ -24,6 +27,16 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
   openfxc-sem analyze --profile vs_3_0 < file.ast.json > file.sem.json
   ```
 - AST inputs are produced by the `openfxc-hlsl` submodule (see `openfxc-hlsl/`), keeping parsing and semantics decoupled.
+
+## Build
+- Prereq: initialize the parser submodule: `git submodule update --init --recursive`
+- Build (Debug): `dotnet build src/openfxc-sem/openfxc-sem.csproj`
+- Build (Release single-file):
+  - Windows (x64): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true`
+  - Linux (x64): `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r linux-x64 -p:PublishSingleFile=true -p:SelfContained=true`
+  - macOS Intel: `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r osx-x64 -p:PublishSingleFile=true -p:SelfContained=true`
+  - macOS Apple Silicon: `dotnet publish src/openfxc-sem/openfxc-sem.csproj -c Release -r osx-arm64 -p:PublishSingleFile=true -p:SelfContained=true`
+- Artifacts land under `src/openfxc-sem/bin/<Configuration>/net8.0/<rid>/publish/`; add `-p:PublishTrimmed=true` if you want smaller binaries (verify before distributing).
 
 ## Semantic Model (output)
 High-level shape of `output.sem.json`:
