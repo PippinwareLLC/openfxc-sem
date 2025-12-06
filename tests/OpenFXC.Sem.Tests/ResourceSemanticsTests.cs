@@ -61,6 +61,36 @@ float4 main(float4 p : SV_Position) : SV_Position
         Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "CBufferMember" && s.GetProperty("name").GetString() == "Color");
     }
 
+    [Fact]
+    public void Captures_structured_and_rw_structured_in_sm5()
+    {
+        var hlslPath = RepoPath("tests", "snapshots", "sm5_structured.hlsl");
+        var astJson = ParseHelper.BuildAstJsonFromPath(hlslPath);
+        BuildHelper.EnsureBuilt();
+
+        using var doc = JsonDocument.Parse(RunAnalyze(astJson, "cs_5_0"));
+        var symbols = doc.RootElement.GetProperty("symbols").EnumerateArray().ToList();
+
+        Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "Resource"
+            && s.GetProperty("name").GetString() == "Input"
+            && (s.GetProperty("type").GetString() ?? string.Empty).StartsWith("StructuredBuffer", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Contains(symbols, s => s.GetProperty("kind").GetString() == "Resource"
+            && s.GetProperty("name").GetString() == "Output"
+            && (s.GetProperty("type").GetString() ?? string.Empty).StartsWith("RWStructuredBuffer", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string RunAnalyze(string astJson, string profile)
+    {
+        var analyzer = new SemanticAnalyzer(profile, "main", astJson);
+        var output = analyzer.Analyze();
+        return JsonSerializer.Serialize(output, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        });
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();
@@ -72,5 +102,14 @@ float4 main(float4 p : SV_Position) : SV_Position
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         });
+    }
+
+    private static string RepoPath(params string[] parts)
+    {
+        var baseDir = AppContext.BaseDirectory;
+        var repoRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", ".."));
+        return parts.Length == 0
+            ? repoRoot
+            : Path.Combine(new[] { repoRoot }.Concat(parts).ToArray());
     }
 }

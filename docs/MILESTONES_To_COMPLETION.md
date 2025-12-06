@@ -12,9 +12,9 @@
   - [x] Stage 4: Update docs/compatibility matrix and mark SM4 complete.
 
 - [ ] **MSC3: SM5 completion**
-  - [ ] Complete structured/RW resource edge cases and intrinsic/type coverage.
-  - [ ] Add SM5 snapshots and negative tests to lock behavior.
-  - [ ] Ensure profile-aware semantics validation matches SM5 expectations.
+  - [x] Complete structured/RW resource edge cases and intrinsic/type coverage.
+  - [x] Add SM5 snapshots and negative tests to lock behavior.
+  - [x] Ensure profile-aware semantics validation matches SM5 expectations.
 
 - [ ] **MSC4: FX constructs (.fx) stance**
   - [ ] Decide on technique/pass semantics: implement or explicitly diagnose/disable.
