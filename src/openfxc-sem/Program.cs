@@ -159,8 +159,8 @@ internal static class Program
                     var rootNode = NodeInfo.FromJson(rootNodeEl);
                     var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                     ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
-                    entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference);
-                    SemanticValidator.Validate(build.Symbols, entryPoints, _profile, _typeInference);
+                    entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference, build.Spans);
+                    SemanticValidator.Validate(build.Symbols, entryPoints, _profile, _typeInference, build.Spans);
                     diagnostics.AddRange(_typeInference.Diagnostics);
                     symbols = build.Symbols;
                     types = build.Types;
@@ -206,14 +206,24 @@ internal static class Program
         {
             var symbols = new List<SymbolInfo>();
             var typeCollector = new TypeCollector();
-            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, typeCollector, tokens, typeInference);
+            var spans = new Dictionary<int, Span>();
+            Traverse(rootNode, parentKind: null, currentFunctionId: null, currentStructId: null, symbols, typeCollector, spans, tokens, typeInference);
             return new SymbolBuildResult(
                 symbols.OrderBy(s => s.Id ?? int.MaxValue).ToList(),
-                typeCollector.ToList());
+                typeCollector.ToList(),
+                spans);
         }
 
-        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TypeCollector types, TokenLookup tokens, TypeInference typeInference)
+        private static void Traverse(NodeInfo node, string? parentKind, int? currentFunctionId, int? currentStructId, List<SymbolInfo> symbols, TypeCollector types, Dictionary<int, Span> spans, TokenLookup tokens, TypeInference typeInference)
         {
+            if (node.Id is not null && node.Span is not null)
+            {
+                if (!spans.ContainsKey(node.Id.Value))
+                {
+                    spans[node.Id.Value] = node.Span.Value;
+                }
+            }
+
             switch (node.Kind)
             {
                 case "FunctionDeclaration":
@@ -230,10 +240,10 @@ internal static class Program
                     }
                     break;
                 case "VariableDeclaration":
+                {
+                    var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens, types, typeInference);
+                    if (variable is not null)
                     {
-                        var variable = BuildVariableSymbol(node, parentKind, currentFunctionId, currentStructId, tokens, types, typeInference);
-                        if (variable is not null)
-                        {
                             symbols.Add(variable);
                         }
                     }
@@ -269,7 +279,7 @@ internal static class Program
 
             foreach (var child in node.Children)
             {
-                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, types, tokens, typeInference);
+                Traverse(child.Node, node.Kind, currentFunctionId, currentStructId, symbols, types, spans, tokens, typeInference);
             }
         }
 
@@ -1560,7 +1570,7 @@ internal static class Program
 
     private static class EntryPointResolver
     {
-        public static List<EntryPointInfo> Resolve(List<SymbolInfo> symbols, string entryName, string profile, TypeInference inference)
+        public static List<EntryPointInfo> Resolve(List<SymbolInfo> symbols, string entryName, string profile, TypeInference inference, Dictionary<int, Span> spans)
         {
             var stage = StageFromProfile(profile);
             var entry = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
@@ -1568,7 +1578,8 @@ internal static class Program
 
             if (entry is null)
             {
-                inference.AddDiagnostic("HLSL3001", $"No entry point function named '{entryName}' found.");
+                var fallback = symbols.FirstOrDefault(s => s.Kind == "Function");
+                inference.AddDiagnostic("HLSL3001", $"No entry point function named '{entryName}' found.", spans.TryGetValue(fallback?.DeclNodeId ?? -1, out var span) ? span : null);
                 entry = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase));
                 if (entry is null)
                 {
@@ -1602,7 +1613,7 @@ internal static class Program
 
     private static class SemanticValidator
     {
-        public static void Validate(List<SymbolInfo> symbols, List<EntryPointInfo> entryPoints, string profile, TypeInference inference)
+        public static void Validate(List<SymbolInfo> symbols, List<EntryPointInfo> entryPoints, string profile, TypeInference inference, Dictionary<int, Span> spans)
         {
             if (entryPoints.Count == 0) return;
 
@@ -1613,59 +1624,60 @@ internal static class Program
             var function = symbols.FirstOrDefault(s => s.Id == entry.SymbolId);
             if (function is not null)
             {
-                ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference);
+                ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference, TryFindSpan(spans, function.DeclNodeId));
             }
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var param in symbols.Where(s => s.ParentSymbolId == entry.SymbolId && string.Equals(s.Kind, "Parameter", StringComparison.OrdinalIgnoreCase)))
             {
-                ValidateParameterSemantic(param, stage, smMajor, inference);
+                var paramSpan = TryFindSpan(spans, param.DeclNodeId);
+                ValidateParameterSemantic(param, stage, smMajor, inference, paramSpan);
                 var key = SemanticKey(param.Semantic);
                 if (!string.IsNullOrEmpty(key))
                 {
                     if (!seen.Add(key))
                     {
-                        inference.AddDiagnostic("HLSL3003", $"Duplicate semantic '{key}' on entry parameters.");
+                        inference.AddDiagnostic("HLSL3003", $"Duplicate semantic '{key}' on entry parameters.", paramSpan);
                     }
                 }
                 else
                 {
-                    inference.AddDiagnostic("HLSL3004", "Entry parameter missing semantic.");
+                    inference.AddDiagnostic("HLSL3004", "Entry parameter missing semantic.", paramSpan);
                 }
             }
 
             if (function is not null && function.ReturnSemantic is null)
             {
-                inference.AddDiagnostic("HLSL3004", "Entry return value missing semantic.");
+                inference.AddDiagnostic("HLSL3004", "Entry return value missing semantic.", TryFindSpan(spans, function.DeclNodeId));
             }
         }
 
-        private static void ValidateReturnSemantic(SemanticInfo? semantic, string stage, int smMajor, TypeInference inference)
+        private static void ValidateReturnSemantic(SemanticInfo? semantic, string stage, int smMajor, TypeInference inference, Span? span)
         {
             if (semantic is null) return;
             if (smMajor < 4 && IsSystemValue(semantic.Name))
             {
-                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.");
+                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{semantic.Name}' is not allowed before SM4.", span);
             }
             if (stage == "Vertex" && string.Equals(semantic.Name, "SV_TARGET", StringComparison.OrdinalIgnoreCase))
             {
-                inference.AddDiagnostic("HLSL3002", "Vertex shaders cannot return SV_TARGET.");
+                inference.AddDiagnostic("HLSL3002", "Vertex shaders cannot return SV_TARGET.", span);
             }
         }
 
-        private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference)
+        private static void ValidateParameterSemantic(SymbolInfo param, string stage, int smMajor, TypeInference inference, Span? span)
         {
             if (param.Semantic is null) return;
             var name = param.Semantic.Name;
 
             if (smMajor < 4 && IsSystemValue(name))
             {
-                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{name}' is not allowed before SM4.");
+                inference.AddDiagnostic("HLSL3002", $"System-value semantic '{name}' is not allowed before SM4.", span);
             }
 
             if (stage == "Pixel" && string.Equals(name, "SV_POSITION", StringComparison.OrdinalIgnoreCase))
             {
-                inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).");
+                inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).", span);
             }
         }
 
@@ -1675,6 +1687,12 @@ internal static class Program
         {
             if (semantic is null) return string.Empty;
             return $"{semantic.Name}:{semantic.Index ?? 0}";
+        }
+
+        private static Span? TryFindSpan(Dictionary<int, Span> spans, int? nodeId)
+        {
+            if (nodeId is null) return null;
+            return spans.TryGetValue(nodeId.Value, out var span) ? span : null;
         }
 
         private static int ParseProfileMajor(string profile)
@@ -1726,7 +1744,7 @@ internal static class Program
 
     private readonly record struct Span(int Start, int End);
 
-    private sealed record SymbolBuildResult(List<SymbolInfo> Symbols, List<TypeInfo> Types);
+    private sealed record SymbolBuildResult(List<SymbolInfo> Symbols, List<TypeInfo> Types, Dictionary<int, Span> Spans);
 
     private sealed record SemanticOutput
     {

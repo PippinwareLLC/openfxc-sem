@@ -1,86 +1,50 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Xunit;
 
 namespace OpenFXC.Sem.Tests;
 
-public class EntryPointTests
+public class DiagnosticsSpanTests
 {
     [Fact]
-    public void Missing_entry_reports_diagnostic()
+    public void Unknown_identifier_diagnostic_has_span()
     {
         var source = @"
-float4 VSMain(float4 p : POSITION0) : SV_Position { return p; }";
-
-        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
-        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
-        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3001");
-        var entries = doc.RootElement.GetProperty("entryPoints").EnumerateArray().ToList();
-        Assert.NotEmpty(entries);
-    }
-
-    [Fact]
-    public void Entry_point_resolves_stage()
-    {
-        var source = @"
-float4 main(float4 p : POSITION0) : SV_Position { return p; }";
+float4 main() : SV_Target
+{
+    return missingThing;
+}";
 
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
-        var entry = doc.RootElement.GetProperty("entryPoints").EnumerateArray().First();
-        Assert.Equal("Pixel", entry.GetProperty("stage").GetString());
-    }
-
-    [Fact]
-    public void Semantics_are_normalized_and_return_semantic_present()
-    {
-        var source = @"
-float4 main(float4 pos : position0) : sv_target { return pos; }";
-
-        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
-        var symbols = doc.RootElement.GetProperty("symbols").EnumerateArray().ToList();
-        var func = symbols.First(s => s.GetProperty("kind").GetString() == "Function");
-        var param = symbols.First(s => s.GetProperty("kind").GetString() == "Parameter");
-
-        Assert.Equal("SV_TARGET", func.GetProperty("returnSemantic").GetProperty("name").GetString());
-        Assert.Equal("POSITION", param.GetProperty("semantic").GetProperty("name").GetString());
-    }
-
-    [Fact]
-    public void System_value_semantics_blocked_before_sm4()
-    {
-        var source = @"
-float4 main(float4 pos : POSITION0) : SV_Target { return pos; }";
-
-        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
-        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
-        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3002");
-    }
-
-    [Fact]
-    public void Duplicate_semantics_on_entry_parameters_reported()
-    {
-        var source = @"
-float4 main(float4 a : POSITION0, float4 b : POSITION0) : SV_Position { return a + b; }";
-
-        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
-        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray();
-        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL3003");
-    }
-
-    [Fact]
-    public void Missing_semantics_on_entry_param_reported()
-    {
-        var source = @"
-float4 main(float4 a, float4 b : POSITION0) : SV_Position { return a + b; }";
-
-        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));
-        var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
-        var diag = diagnostics.First(d => d.GetProperty("id").GetString() == "HLSL3004");
+        var diag = doc.RootElement.GetProperty("diagnostics").EnumerateArray().First(d => d.GetProperty("id").GetString() == "HLSL2005");
         var span = diag.GetProperty("span");
-        Assert.True(span.GetProperty("start").GetInt32() >= 0);
-        Assert.True(span.GetProperty("end").GetInt32() >= span.GetProperty("start").GetInt32());
+        var start = span.GetProperty("start").GetInt32();
+        var end = span.GetProperty("end").GetInt32();
+        Assert.True(start >= 0);
+        Assert.True(end >= start);
+    }
+
+    [Fact]
+    public void Binary_mismatch_diagnostic_has_span()
+    {
+        var source = @"
+float4 main() : SV_Target
+{
+    float2 a = 1;
+    float3 b = 2;
+    return a + b;
+}";
+
+        using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
+        var diag = doc.RootElement.GetProperty("diagnostics").EnumerateArray().First(d => d.GetProperty("id").GetString() == "HLSL2002");
+        var span = diag.GetProperty("span");
+        var start = span.GetProperty("start").GetInt32();
+        var end = span.GetProperty("end").GetInt32();
+        Assert.True(start >= 0);
+        Assert.True(end >= start);
     }
 
     private static string RunParseThenAnalyzeSource(string source, string profile)
