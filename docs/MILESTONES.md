@@ -8,10 +8,10 @@
   - Collect globals, locals, parameters, functions, structs/typedefs, samplers/resources, cbuffers/tbuffers.
   - Parent-child relationships and declaration node links recorded.
   - Unit tests for symbol presence across simple shaders.
-- [x] **M2: Type Inference Core**
-  - Scalars/vectors/matrices/arrays/resources and function signatures represented.
-  - Expression inference for arithmetic, swizzles, indexing, constructors, casts.
-  - Positive/negative inference tests with diagnostics.
+- [ ] **M2: Type Inference Core**
+  - Scalars/vectors/matrices/arrays/resources and function signatures represented. *(Structured SemType model implemented and used across symbol/expr typing.)*
+  - Expression inference for arithmetic, swizzles, indexing, constructors, casts. *(Binary/swizzle/index/call inference wired; constructor shape/arity checks still pending.)*
+  - Positive/negative inference tests with diagnostics. *(Need targeted negative tests for bad constructor arity, array/resource cases, and operand mismatches.)*
 - [ ] **M3: Intrinsic Resolution**
   - Intrinsic catalog (mul/dot/normalize/saturate/tex2D/etc.) with deterministic signatures.
   - Arity/type checking with diagnostics on misuse.

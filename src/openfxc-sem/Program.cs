@@ -287,14 +287,15 @@ internal static class Program
 
             var typeNode = GetChildNode(node, "type");
             var typeNodeId = typeNode?.Id ?? node.Id;
-            var normalizedReturn = typeInference.NormalizeType(returnType);
-            types.Add(typeNodeId, normalizedReturn);
+            var normalizedReturn = typeInference.ParseType(returnType) ?? SemType.Scalar("void");
+            types.Add(typeNodeId, normalizedReturn.ToNormalizedString());
             typeInference.AddNodeType(typeNodeId, normalizedReturn);
 
+            var parameterSemTypes = parameterTypes.Select(p => typeInference.ParseType(p) ?? SemType.Scalar("void")).ToList();
             var funcType = BuildFunctionType(returnType, parameterTypes);
-            var normalizedFuncType = typeInference.NormalizeFunctionType(normalizedReturn, parameterTypes);
+            var normalizedFuncType = typeInference.NormalizeFunctionType(normalizedReturn, parameterSemTypes);
             types.Add(node.Id, normalizedFuncType);
-            typeInference.AddNodeType(node.Id, normalizedFuncType);
+            typeInference.AddNodeType(node.Id, SemType.Function(normalizedReturn, parameterSemTypes));
 
             symbols.Add(new SymbolInfo
             {
@@ -326,9 +327,12 @@ internal static class Program
 
             var typeNode = GetChildNode(node, "type");
             var typeNodeId = typeNode?.Id ?? node.Id;
-            var normalizedType = typeInference.NormalizeType(type);
-            types.Add(typeNodeId, normalizedType);
-            typeInference.AddNodeType(typeNodeId, normalizedType);
+            var normalizedType = typeInference.ParseType(type);
+            if (normalizedType is not null)
+            {
+                types.Add(typeNodeId, normalizedType.Value.ToNormalizedString());
+                typeInference.AddNodeType(typeNodeId, normalizedType);
+            }
 
             return new SymbolInfo
             {
@@ -362,9 +366,12 @@ internal static class Program
 
             var typeNode = GetChildNode(node, "type");
             var typeNodeId = typeNode?.Id ?? node.Id;
-            var normalizedType = typeInference.NormalizeType(type);
-            types.Add(typeNodeId, normalizedType);
-            typeInference.AddNodeType(typeNodeId, normalizedType);
+            var normalizedType = typeInference.ParseType(type);
+            if (normalizedType is not null)
+            {
+                types.Add(typeNodeId, normalizedType.Value.ToNormalizedString());
+                typeInference.AddNodeType(typeNodeId, normalizedType);
+            }
 
             return new SymbolInfo
             {
@@ -419,8 +426,8 @@ internal static class Program
 
         private static string BuildFunctionType(string returnType, IReadOnlyList<string> parameterTypes)
         {
-            var parameters = string.Join(", ", parameterTypes);
-            return $"{returnType}({parameters})";
+            var parameters = string.Join(", ", parameterTypes.Select(p => p ?? "void"));
+            return $"{returnType ?? "void"}({parameters})";
         }
 
         private static SemanticInfo? ParseSemanticString(string? semantic)
@@ -662,32 +669,388 @@ internal static class Program
         }
     }
 
+    private enum TypeKind
+    {
+        Unknown,
+        Scalar,
+        Vector,
+        Matrix,
+        Array,
+        Resource,
+        Function
+    }
+
+    private readonly record struct SemType
+    {
+        public TypeKind Kind { get; init; }
+        public string BaseType { get; init; } = string.Empty;
+        public int Rows { get; init; }
+        public int Columns { get; init; }
+        public int? ArrayLength { get; init; }
+        public SemType? ElementType { get; init; }
+        public IReadOnlyList<SemType> ParameterTypes { get; init; } = Array.Empty<SemType>();
+        public SemType? ReturnType { get; init; }
+
+        public bool IsNumeric => Kind is TypeKind.Scalar or TypeKind.Vector or TypeKind.Matrix;
+        public bool IsVector => Kind == TypeKind.Vector;
+        public bool IsMatrix => Kind == TypeKind.Matrix;
+        public bool IsScalar => Kind == TypeKind.Scalar;
+        public int VectorSize => Columns;
+
+        public static SemType Scalar(string baseType) => new SemType
+        {
+            Kind = TypeKind.Scalar,
+            BaseType = NormalizeBase(baseType),
+            Rows = 1,
+            Columns = 1,
+            ParameterTypes = Array.Empty<SemType>()
+        };
+
+        public static SemType Vector(string baseType, int width) => new SemType
+        {
+            Kind = TypeKind.Vector,
+            BaseType = NormalizeBase(baseType),
+            Rows = 1,
+            Columns = width,
+            ParameterTypes = Array.Empty<SemType>()
+        };
+
+        public static SemType Matrix(string baseType, int rows, int cols) => new SemType
+        {
+            Kind = TypeKind.Matrix,
+            BaseType = NormalizeBase(baseType),
+            Rows = rows,
+            Columns = cols,
+            ParameterTypes = Array.Empty<SemType>()
+        };
+
+        public static SemType Array(SemType elementType, int? length) => new SemType
+        {
+            Kind = TypeKind.Array,
+            BaseType = elementType.BaseType,
+            Rows = elementType.Rows,
+            Columns = elementType.Columns,
+            ArrayLength = length,
+            ElementType = elementType,
+            ParameterTypes = Array.Empty<SemType>()
+        };
+
+        public static SemType Resource(string name) => new SemType
+        {
+            Kind = TypeKind.Resource,
+            BaseType = NormalizeBase(name),
+            Rows = 1,
+            Columns = 1,
+            ParameterTypes = Array.Empty<SemType>()
+        };
+
+        public static SemType Function(SemType returnType, IReadOnlyList<SemType> parameters) => new SemType
+        {
+            Kind = TypeKind.Function,
+            BaseType = returnType.BaseType,
+            Rows = 1,
+            Columns = 1,
+            ReturnType = returnType,
+            ParameterTypes = parameters?.ToArray() ?? Array.Empty<SemType>()
+        };
+
+        public string? ToNormalizedString()
+        {
+            return Kind switch
+            {
+                TypeKind.Scalar => BaseType,
+                TypeKind.Vector => $"{BaseType}{Columns}",
+                TypeKind.Matrix => $"{BaseType}{Rows}x{Columns}",
+                TypeKind.Array => $"{ElementType?.ToNormalizedString()}[{(ArrayLength.HasValue ? ArrayLength.Value.ToString() : string.Empty)}]",
+                TypeKind.Resource => BaseType,
+                TypeKind.Function => $"{ReturnType?.ToNormalizedString()}({string.Join(", ", ParameterTypes.Select(p => p.ToNormalizedString()))})",
+                _ => BaseType
+            };
+        }
+
+        public override string ToString() => ToNormalizedString() ?? BaseType;
+
+        public static SemType? Parse(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+
+            var text = raw.Trim();
+            var lower = text.ToLowerInvariant();
+
+            var openIdx = text.IndexOf('(');
+            var closeIdx = text.LastIndexOf(')');
+            if (openIdx > 0 && closeIdx == text.Length - 1)
+            {
+                var retText = text[..openIdx];
+                var argsText = text[(openIdx + 1)..closeIdx];
+                var retType = Parse(retText) ?? Scalar("void");
+                var args = new List<SemType>();
+                if (!string.IsNullOrWhiteSpace(argsText))
+                {
+                    foreach (var arg in argsText.Split(','))
+                    {
+                        var parsedArg = Parse(arg);
+                        if (parsedArg is not null)
+                        {
+                            args.Add(parsedArg.Value);
+                        }
+                    }
+                }
+                return Function(retType, args);
+            }
+
+            var bracketIdx = text.IndexOf('[');
+            if (bracketIdx > 0 && text.EndsWith("]", StringComparison.Ordinal))
+            {
+                var basePart = text[..bracketIdx];
+                var lenPart = text[(bracketIdx + 1)..^1];
+                var element = Parse(basePart);
+                if (element is null) return null;
+                int? len = null;
+                if (int.TryParse(lenPart, out var parsedLen))
+                {
+                    len = parsedLen;
+                }
+                return Array(element.Value, len);
+            }
+
+            var xIdx = lower.IndexOf('x');
+            if (xIdx > 0 && xIdx < lower.Length - 1 && char.IsDigit(lower[xIdx - 1]))
+            {
+                var left = lower[..xIdx];
+                var right = lower[(xIdx + 1)..];
+                if (TryParseBaseWithNumber(left, out var baseName, out var rows) && int.TryParse(right, out var cols))
+                {
+                    return Matrix(baseName, rows, cols);
+                }
+            }
+
+            if (TryParseBaseWithNumber(lower, out var baseType, out var width))
+            {
+                if (width > 1)
+                {
+                    return Vector(baseType, width);
+                }
+                return Scalar(baseType);
+            }
+
+            if (IsResourceName(lower))
+            {
+                return Resource(lower);
+            }
+
+            if (IsNumericBase(lower) || string.Equals(lower, "void", StringComparison.OrdinalIgnoreCase))
+            {
+                return Scalar(lower);
+            }
+
+            return Resource(lower);
+        }
+
+        private static bool TryParseBaseWithNumber(string text, out string baseName, out int number)
+        {
+            baseName = NormalizeBase(text);
+            number = 1;
+
+            var i = baseName.Length - 1;
+            while (i >= 0 && char.IsDigit(baseName[i]))
+            {
+                i--;
+            }
+
+            if (i == baseName.Length - 1)
+            {
+                return false;
+            }
+
+            var numPart = baseName[(i + 1)..];
+            baseName = baseName[..(i + 1)];
+            return int.TryParse(numPart, out number);
+        }
+
+        private static string NormalizeBase(string baseType) => baseType.Trim().ToLowerInvariant();
+
+        private static bool IsResourceName(string name)
+        {
+            return name.StartsWith("sampler", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("texture", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("buffer", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsNumericBase(string name)
+        {
+            return name is "float" or "half" or "double" or "int" or "uint" or "bool";
+        }
+    }
+
+    private static class TypeCompatibility
+    {
+        private static readonly Dictionary<string, int> ScalarRank = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "bool", 0 },
+            { "int", 1 },
+            { "uint", 1 },
+            { "half", 2 },
+            { "float", 3 },
+            { "double", 4 }
+        };
+
+        public static SemType? PromoteBinary(SemType? left, SemType? right)
+        {
+            if (left is null) return right;
+            if (right is null) return left;
+
+            var l = left.Value;
+            var r = right.Value;
+
+            if (!l.IsNumeric || !r.IsNumeric)
+            {
+                return null;
+            }
+
+            if (l.Kind == TypeKind.Function || r.Kind == TypeKind.Function)
+            {
+                return null;
+            }
+
+            if (l.Kind == TypeKind.Array && r.Kind == TypeKind.Array && l.ElementType is not null && r.ElementType is not null)
+            {
+                var element = PromoteBinary(l.ElementType, r.ElementType);
+                if (element is null) return null;
+                return SemType.Array(element.Value, l.ArrayLength ?? r.ArrayLength);
+            }
+
+            if (l.Kind == TypeKind.Vector && r.Kind == TypeKind.Vector)
+            {
+                if (l.VectorSize != r.VectorSize) return null;
+                return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), l.VectorSize);
+            }
+
+            if (l.Kind == TypeKind.Matrix && r.Kind == TypeKind.Matrix)
+            {
+                if (l.Rows != r.Rows || l.Columns != r.Columns) return null;
+                return SemType.Matrix(PromoteBase(l.BaseType, r.BaseType), l.Rows, l.Columns);
+            }
+
+            if (l.Kind == TypeKind.Vector && r.Kind == TypeKind.Scalar)
+            {
+                return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), l.VectorSize);
+            }
+
+            if (l.Kind == TypeKind.Scalar && r.Kind == TypeKind.Vector)
+            {
+                return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), r.VectorSize);
+            }
+
+            if (l.Kind == TypeKind.Matrix && r.Kind == TypeKind.Scalar)
+            {
+                return SemType.Matrix(PromoteBase(l.BaseType, r.BaseType), l.Rows, l.Columns);
+            }
+
+            if (l.Kind == TypeKind.Scalar && r.Kind == TypeKind.Matrix)
+            {
+                return SemType.Matrix(PromoteBase(l.BaseType, r.BaseType), r.Rows, r.Columns);
+            }
+
+            if (l.Kind == TypeKind.Scalar && r.Kind == TypeKind.Scalar)
+            {
+                return SemType.Scalar(PromoteBase(l.BaseType, r.BaseType));
+            }
+
+            return null;
+        }
+
+        public static bool CanPromote(SemType from, SemType to)
+        {
+            if (from.Kind == TypeKind.Function || to.Kind == TypeKind.Function)
+            {
+                return false;
+            }
+
+            if (from.Kind == to.Kind)
+            {
+                return from.Kind switch
+                {
+                    TypeKind.Scalar => CanPromoteBase(from.BaseType, to.BaseType),
+                    TypeKind.Vector => from.VectorSize == to.VectorSize && CanPromoteBase(from.BaseType, to.BaseType),
+                    TypeKind.Matrix => from.Rows == to.Rows && from.Columns == to.Columns && CanPromoteBase(from.BaseType, to.BaseType),
+                    TypeKind.Resource => string.Equals(from.BaseType, to.BaseType, StringComparison.OrdinalIgnoreCase),
+                    TypeKind.Array when from.ElementType is not null && to.ElementType is not null =>
+                        (!to.ArrayLength.HasValue || from.ArrayLength == to.ArrayLength)
+                        && CanPromote(from.ElementType.Value, to.ElementType.Value),
+                    _ => false
+                };
+            }
+
+            if (from.Kind == TypeKind.Scalar && (to.Kind == TypeKind.Vector || to.Kind == TypeKind.Matrix))
+            {
+                return CanPromoteBase(from.BaseType, to.BaseType);
+            }
+
+            if (from.Kind == TypeKind.Vector && to.Kind == TypeKind.Matrix)
+            {
+                return from.VectorSize == to.Columns && CanPromoteBase(from.BaseType, to.BaseType);
+            }
+
+            if (from.Kind == TypeKind.Scalar && to.Kind == TypeKind.Array && to.ElementType is not null)
+            {
+                return CanPromote(from, to.ElementType.Value);
+            }
+
+            return false;
+        }
+
+        private static string PromoteBase(string a, string b)
+        {
+            var rankA = RankOf(a);
+            var rankB = RankOf(b);
+            if (rankA < 0) return b;
+            if (rankB < 0) return a;
+            return rankA >= rankB ? a : b;
+        }
+
+        private static bool CanPromoteBase(string from, string to)
+        {
+            var rankFrom = RankOf(from);
+            var rankTo = RankOf(to);
+            return rankFrom >= 0 && rankTo >= 0 && rankFrom <= rankTo;
+        }
+
+        private static int RankOf(string name) => ScalarRank.TryGetValue(name, out var rank) ? rank : -1;
+    }
+
     private sealed class TypeInference
     {
-        private readonly Dictionary<int, string> _nodeTypes = new();
+        private readonly Dictionary<int, SemType> _nodeTypes = new();
         private readonly List<DiagnosticInfo> _diagnostics = new();
 
-        public string? NormalizeType(string? type)
+        public SemType? ParseType(string? type)
         {
             if (string.IsNullOrWhiteSpace(type))
             {
                 return null;
             }
 
-            var trimmed = type.Trim();
-            return trimmed;
+            return SemType.Parse(type);
         }
 
-        public string NormalizeFunctionType(string? returnType, IReadOnlyList<string?> parameters)
+        public string? NormalizeType(string? type)
         {
-            var normalizedReturn = NormalizeType(returnType) ?? "void";
-            var normalizedParams = parameters.Select(p => NormalizeType(p) ?? "void");
-            return $"{normalizedReturn}({string.Join(", ", normalizedParams)})";
+            var parsed = ParseType(type);
+            return NormalizeType(parsed);
         }
 
-        public void AddNodeType(int? nodeId, string? type)
+        public string? NormalizeType(SemType? type)
         {
-            if (nodeId is null || string.IsNullOrWhiteSpace(type))
+            return type?.ToNormalizedString();
+        }
+
+        public string NormalizeFunctionType(SemType returnType, IReadOnlyList<SemType> parameters) =>
+            SemType.Function(returnType, parameters).ToNormalizedString() ?? string.Empty;
+
+        public void AddNodeType(int? nodeId, SemType? type)
+        {
+            if (nodeId is null || type is null)
             {
                 return;
             }
@@ -697,13 +1060,19 @@ internal static class Program
                 return;
             }
 
-            _nodeTypes[nodeId.Value] = type!;
+            _nodeTypes[nodeId.Value] = type.Value;
         }
 
-        public string? GetNodeType(int? nodeId)
+        public SemType? GetNodeType(int? nodeId)
         {
             if (nodeId is null) return null;
             return _nodeTypes.TryGetValue(nodeId.Value, out var t) ? t : null;
+        }
+
+        public string? GetNodeTypeString(int? nodeId)
+        {
+            var t = GetNodeType(nodeId);
+            return NormalizeType(t);
         }
 
         public void AddDiagnostic(string id, string message)
@@ -721,14 +1090,12 @@ internal static class Program
 
     private static class ExpressionTypeAnalyzer
     {
-        private static readonly HashSet<string> ScalarTypes = new(StringComparer.OrdinalIgnoreCase) { "float", "int", "bool", "half", "double" };
-
         public static void Infer(NodeInfo root, TokenLookup tokens, List<SymbolInfo> symbols, List<TypeInfo> types, TypeInference typeInference)
         {
             var symbolTypes = symbols
                 .Where(s => !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Type))
                 .GroupBy(s => s.Name!)
-                .ToDictionary(g => g.Key, g => g.First().Type!);
+                .ToDictionary(g => g.Key, g => typeInference.ParseType(g.First().Type!));
 
             Traverse(root);
 
@@ -744,7 +1111,7 @@ internal static class Program
                     case "Identifier":
                         {
                             var name = tokens.GetText(node.Span);
-                            if (name is not null && symbolTypes.TryGetValue(name, out var t))
+                            if (name is not null && symbolTypes.TryGetValue(name, out var t) && t is not null)
                             {
                                 AddType(types, typeInference, node.Id, t);
                             }
@@ -767,12 +1134,12 @@ internal static class Program
                         InferCall(node, tokens, symbolTypes, typeInference, types);
                         break;
                     case "BinaryExpression":
-                        InferBinary(node, tokens, typeInference, types);
+                        InferBinary(node, typeInference, types);
                         break;
                     case "CastExpression":
                         {
                             var typeNode = node.Children.FirstOrDefault(c => string.Equals(c.Role, "type", StringComparison.OrdinalIgnoreCase)).Node;
-                            var targetType = typeNode is null ? null : tokens.GetText(typeNode.Span);
+                            var targetType = typeNode is null ? null : typeInference.ParseType(tokens.GetText(typeNode.Span));
                             AddType(types, typeInference, node.Id, targetType);
                         }
                         break;
@@ -790,23 +1157,20 @@ internal static class Program
             }
         }
 
-        private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, string> symbolTypes, TypeInference typeInference, List<TypeInfo> types)
+        private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, SemType?> symbolTypes, TypeInference typeInference, List<TypeInfo> types)
         {
             var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
             var calleeName = callee is null ? null : tokens.GetText(callee.Span);
             var arguments = node.Children.Where(c => string.Equals(c.Role, "argument", StringComparison.OrdinalIgnoreCase)).Select(c => c.Node).ToList();
             var argTypes = arguments.Select(a => typeInference.GetNodeType(a.Id)).ToList();
 
-            string? inferred = null;
+            SemType? inferred = null;
             if (!string.IsNullOrWhiteSpace(calleeName))
             {
-                if (IsTypeName(calleeName!))
+                if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Value.Kind == TypeKind.Function)
                 {
-                    inferred = calleeName;
-                }
-                else if (symbolTypes.TryGetValue(calleeName!, out var fnType))
-                {
-                    inferred = ExtractReturnType(fnType);
+                    inferred = fnType.Value.ReturnType;
+                    CheckCallCompatibility(calleeName!, fnType.Value, argTypes, typeInference);
                 }
                 else if (string.Equals(calleeName, "mul", StringComparison.OrdinalIgnoreCase) && argTypes.Count >= 1)
                 {
@@ -814,14 +1178,11 @@ internal static class Program
                 }
                 else
                 {
-                    // Constructor-style: if callee is a type name, expect args to be convertible.
-                    if (IsTypeName(calleeName))
+                    var ctorType = typeInference.ParseType(calleeName);
+                    if (ctorType is not null)
                     {
-                        inferred = calleeName;
-                        if (argTypes.Any(a => a is null))
-                        {
-                            typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.");
-                        }
+                        inferred = ctorType;
+                        CheckConstructorArguments(calleeName!, ctorType.Value, argTypes, typeInference);
                     }
                 }
             }
@@ -833,14 +1194,52 @@ internal static class Program
             AddType(types, typeInference, node.Id, inferred);
         }
 
-        private static void InferBinary(NodeInfo node, TokenLookup tokens, TypeInference typeInference, List<TypeInfo> types)
+        private static void CheckCallCompatibility(string calleeName, SemType functionType, IReadOnlyList<SemType?> args, TypeInference typeInference)
+        {
+            var parameters = functionType.ParameterTypes ?? Array.Empty<SemType>();
+            if (parameters.Count != args.Count)
+            {
+                typeInference.AddDiagnostic("HLSL2001", $"Function '{calleeName}' expects {parameters.Count} arguments but got {args.Count}.");
+                return;
+            }
+
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                var arg = args[i];
+                var param = parameters[i];
+                if (arg is null || !TypeCompatibility.CanPromote(arg.Value, param))
+                {
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot convert argument {i} to parameter of type '{param}'.");
+                    return;
+                }
+            }
+        }
+
+        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference)
+        {
+            if (args.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var arg in args)
+            {
+                if (arg is null || !TypeCompatibility.CanPromote(arg.Value, targetType))
+                {
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.");
+                    return;
+                }
+            }
+        }
+
+        private static void InferBinary(NodeInfo node, TypeInference typeInference, List<TypeInfo> types)
         {
             var left = node.Children.FirstOrDefault(c => string.Equals(c.Role, "left", StringComparison.OrdinalIgnoreCase)).Node;
             var right = node.Children.FirstOrDefault(c => string.Equals(c.Role, "right", StringComparison.OrdinalIgnoreCase)).Node;
             var lt = typeInference.GetNodeType(left?.Id);
             var rt = typeInference.GetNodeType(right?.Id);
 
-            var merged = MergeBinaryTypes(lt, rt);
+            var merged = TypeCompatibility.PromoteBinary(lt, rt);
             if (merged is null && lt is not null && rt is not null)
             {
                 typeInference.AddDiagnostic("HLSL2002", $"Type mismatch in binary expression: '{lt}' vs '{rt}'.");
@@ -848,27 +1247,25 @@ internal static class Program
             AddType(types, typeInference, node.Id, merged);
         }
 
-        private static string? InferIndexedType(string? baseType)
+        private static SemType? InferIndexedType(SemType? baseType)
         {
-            if (string.IsNullOrWhiteSpace(baseType)) return null;
-            if (IsVector(baseType))
+            if (baseType is null)
             {
-                return baseType.TrimEnd('2', '3', '4', 'x', 'X', 'y', 'Y', 'z', 'Z', 'w', 'W', 'r', 'g', 'b', 'a');
+                return null;
             }
-            if (IsMatrix(baseType))
+
+            return baseType.Value.Kind switch
             {
-                var parts = baseType.Split('x', 'X');
-                if (parts.Length == 2 && int.TryParse(parts[1], out var cols))
-                {
-                    return $"{parts[0]}{cols}";
-                }
-            }
-            return baseType;
+                TypeKind.Array when baseType.Value.ElementType is not null => baseType.Value.ElementType,
+                TypeKind.Vector => SemType.Scalar(baseType.Value.BaseType),
+                TypeKind.Matrix => SemType.Vector(baseType.Value.BaseType, baseType.Value.Columns),
+                _ => baseType
+            };
         }
 
-        private static void AddType(List<TypeInfo> types, TypeInference typeInference, int? nodeId, string? type)
+        private static void AddType(List<TypeInfo> types, TypeInference typeInference, int? nodeId, SemType? type)
         {
-            if (nodeId is null || string.IsNullOrWhiteSpace(type))
+            if (nodeId is null || type is null)
             {
                 return;
             }
@@ -883,25 +1280,13 @@ internal static class Program
             }
 
             types.Add(new TypeInfo { NodeId = nodeId, Type = normalized });
-            typeInference.AddNodeType(nodeId, normalized);
+            typeInference.AddNodeType(nodeId, type);
         }
 
-        private static bool IsTypeName(string name)
+        private static bool IsTypeName(string name) => SemType.Parse(name) is not null;
+        private static SemType? InferSwizzleType(SemType? baseType, string? swizzle)
         {
-            return ScalarTypes.Contains(name)
-                   || IsVector(name)
-                   || IsMatrix(name);
-        }
-
-        private static string? ExtractReturnType(string fnType)
-        {
-            var idx = fnType.IndexOf('(');
-            return idx > 0 ? fnType[..idx] : fnType;
-        }
-
-        private static string? InferSwizzleType(string? baseType, string? swizzle)
-        {
-            if (string.IsNullOrWhiteSpace(baseType) || string.IsNullOrWhiteSpace(swizzle))
+            if (baseType is null || string.IsNullOrWhiteSpace(swizzle))
             {
                 return null;
             }
@@ -912,11 +1297,15 @@ internal static class Program
                 return baseType;
             }
 
-            var scalar = baseType.TrimEnd('1', '2', '3', '4');
-            return count == 1 ? scalar : $"{scalar}{count}";
+            if (count == 1)
+            {
+                return SemType.Scalar(baseType.Value.BaseType);
+            }
+
+            return SemType.Vector(baseType.Value.BaseType, count);
         }
 
-        private static string? InferLiteralType(string? text)
+        private static SemType? InferLiteralType(string? text)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -924,47 +1313,18 @@ internal static class Program
             }
 
             var span = text.Trim();
-            if (span.Contains(".") || span.IndexOfAny(new[] { 'e', 'E' }) >= 0 || span.EndsWith("f", StringComparison.OrdinalIgnoreCase))
-            {
-                return "float";
-            }
-
             if (span.StartsWith("true", StringComparison.OrdinalIgnoreCase) || span.StartsWith("false", StringComparison.OrdinalIgnoreCase))
             {
-                return "bool";
+                return SemType.Scalar("bool");
             }
 
-            return "int";
-        }
-
-        private static string? MergeBinaryTypes(string? left, string? right)
-        {
-            if (string.IsNullOrWhiteSpace(left)) return right;
-            if (string.IsNullOrWhiteSpace(right)) return left;
-            if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase)) return left;
-
-            if (IsVectorOrMatrix(left) && IsVectorOrMatrix(right))
+            if (span.Contains(".") || span.IndexOfAny(new[] { 'e', 'E' }) >= 0 || span.EndsWith("f", StringComparison.OrdinalIgnoreCase))
             {
-                return left.Length >= right.Length ? left : right;
+                return SemType.Scalar("float");
             }
 
-            if (IsVectorOrMatrix(left)) return left;
-            if (IsVectorOrMatrix(right)) return right;
-            if (ScalarTypes.Contains(left)) return left;
-            if (ScalarTypes.Contains(right)) return right;
-
-            return left;
+            return SemType.Scalar("int");
         }
-
-        private static bool IsVectorOrMatrix(string type) => IsVector(type) || IsMatrix(type);
-
-        private static bool IsVector(string type)
-        {
-            return type.StartsWith("float", StringComparison.OrdinalIgnoreCase) && type.Length > "float".Length
-                || type.StartsWith("int", StringComparison.OrdinalIgnoreCase) && type.Length > "int".Length;
-        }
-
-        private static bool IsMatrix(string type) => type.IndexOf('x') >= 0 || type.IndexOf('X') >= 0;
     }
 
     private sealed record NodeInfo(int? Id, string? Kind, Span? Span, List<NodeChild> Children)
