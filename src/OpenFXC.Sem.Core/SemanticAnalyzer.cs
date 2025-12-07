@@ -23,6 +23,7 @@ public sealed class SemanticAnalyzer
     {
         int? rootId = null;
         NodeInfo? rootNode = null;
+        TokenLookup? tokens = null;
         List<SymbolInfo> symbols = new();
         List<TypeInfo> types = new();
         List<DiagnosticInfo> diagnostics = new();
@@ -34,7 +35,7 @@ public sealed class SemanticAnalyzer
             using var doc = JsonDocument.Parse(_inputJson);
             var root = doc.RootElement;
             rootId = TryGetRootId(root);
-            var tokens = TokenLookup.From(root);
+            tokens = TokenLookup.From(root);
             _typeInference.SetDocumentLength(tokens.DocumentLength);
             if (root.TryGetProperty("root", out var rootNodeEl))
             {
@@ -61,13 +62,13 @@ public sealed class SemanticAnalyzer
         {
             FormatVersion = 3,
             Profile = _profile,
-            Syntax = rootNode is null || rootId is null
-                ? null
-                : new SyntaxInfo
-                {
-                    RootId = rootId.Value,
-                    Nodes = BuildSyntaxNodes(rootNode)
-                },
+                Syntax = rootNode is null || rootId is null || tokens is null
+                    ? null
+                    : new SyntaxInfo
+                    {
+                        RootId = rootId.Value,
+                        Nodes = BuildSyntaxNodes(rootNode, tokens, symbols)
+                    },
             Symbols = symbols,
             Types = types,
             EntryPoints = entryPoints,
@@ -89,9 +90,13 @@ public sealed class SemanticAnalyzer
         return null;
     }
 
-    private static IReadOnlyList<SyntaxNodeInfo> BuildSyntaxNodes(NodeInfo root)
+    private static IReadOnlyList<SyntaxNodeInfo> BuildSyntaxNodes(NodeInfo root, TokenLookup tokens, IReadOnlyList<SymbolInfo> symbols)
     {
         var nodes = new List<SyntaxNodeInfo>();
+        var symbolLookup = symbols
+            .Where(s => s.Id is not null && !string.IsNullOrWhiteSpace(s.Name))
+            .GroupBy(s => s.Name!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id!.Value, StringComparer.OrdinalIgnoreCase);
 
         void Traverse(NodeInfo node)
         {
@@ -103,12 +108,42 @@ public sealed class SemanticAnalyzer
                 })
                 .ToList();
 
+            int? referencedSymbolId = null;
+
+            if (string.Equals(node.Kind, "Identifier", StringComparison.OrdinalIgnoreCase))
+            {
+                var name = tokens.GetText(node.Span);
+                if (name is not null && symbolLookup.TryGetValue(name, out var symId))
+                {
+                    referencedSymbolId = symId;
+                }
+            }
+            else if (string.Equals(node.Kind, "CallExpression", StringComparison.OrdinalIgnoreCase))
+            {
+                var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
+                var calleeName = callee is null ? null : tokens.GetText(callee.Span);
+                if (calleeName is not null && symbolLookup.TryGetValue(calleeName, out var symId))
+                {
+                    referencedSymbolId = symId;
+                }
+            }
+            else if (string.Equals(node.Kind, "MemberAccessExpression", StringComparison.OrdinalIgnoreCase))
+            {
+                var text = tokens.GetText(node.Span);
+                var memberName = text?.Split('.').LastOrDefault();
+                if (!string.IsNullOrWhiteSpace(memberName) && symbolLookup.TryGetValue(memberName!, out var symId))
+                {
+                    referencedSymbolId = symId;
+                }
+            }
+
             nodes.Add(new SyntaxNodeInfo
             {
                 Id = node.Id,
                 Kind = node.Kind ?? string.Empty,
                 Span = node.Span is null ? null : new SyntaxSpan { Start = node.Span.Value.Start, End = node.Span.Value.End },
-                Children = children
+                Children = children,
+                ReferencedSymbolId = referencedSymbolId
             });
 
             foreach (var child in node.Children)
@@ -2396,6 +2431,9 @@ public sealed record SyntaxNodeInfo
 
     [JsonPropertyName("span")]
     public SyntaxSpan? Span { get; init; }
+
+    [JsonPropertyName("referencedSymbolId")]
+    public int? ReferencedSymbolId { get; init; }
 
     [JsonPropertyName("children")]
     public IReadOnlyList<SyntaxNodeChild> Children { get; init; } = Array.Empty<SyntaxNodeChild>();

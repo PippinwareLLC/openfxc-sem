@@ -64,6 +64,7 @@
           "start": 7,
           "end": 11
         },
+        "referencedSymbolId": 13,
         "children": []
       },
       {
@@ -104,6 +105,7 @@
           "start": 19,
           "end": 22
         },
+        "referencedSymbolId": 7,
         "children": []
       },
       {
@@ -187,6 +189,7 @@
           "start": 65,
           "end": 68
         },
+        "referencedSymbolId": 7,
         "children": []
       }
     ]

@@ -51,6 +51,7 @@
           "start": 8,
           "end": 16
         },
+        "referencedSymbolId": 3,
         "children": []
       },
       {
@@ -87,6 +88,7 @@
           "start": 83,
           "end": 87
         },
+        "referencedSymbolId": 11,
         "children": []
       },
       {
@@ -141,6 +143,7 @@
           "start": 101,
           "end": 104
         },
+        "referencedSymbolId": 9,
         "children": []
       },
       {
@@ -212,6 +215,7 @@
           "start": 128,
           "end": 132
         },
+        "referencedSymbolId": 34,
         "children": []
       },
       {
@@ -248,6 +252,7 @@
           "start": 138,
           "end": 143
         },
+        "referencedSymbolId": 16,
         "children": []
       },
       {
@@ -329,6 +334,7 @@
           "start": 172,
           "end": 173
         },
+        "referencedSymbolId": 27,
         "children": []
       },
       {
@@ -369,6 +375,7 @@
           "start": 180,
           "end": 189
         },
+        "referencedSymbolId": 9,
         "children": [
           {
             "role": "expression",
@@ -387,6 +394,7 @@
           "start": 180,
           "end": 185
         },
+        "referencedSymbolId": 16,
         "children": []
       },
       {
@@ -396,6 +404,7 @@
           "start": 186,
           "end": 189
         },
+        "referencedSymbolId": 9,
         "children": []
       },
       {
@@ -450,6 +459,7 @@
           "start": 210,
           "end": 211
         },
+        "referencedSymbolId": 27,
         "children": []
       },
       {

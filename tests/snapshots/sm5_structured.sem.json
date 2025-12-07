@@ -55,6 +55,7 @@
           "start": 8,
           "end": 16
         },
+        "referencedSymbolId": 3,
         "children": []
       },
       {
@@ -104,6 +105,7 @@
           "start": 83,
           "end": 88
         },
+        "referencedSymbolId": 11,
         "children": []
       },
       {
@@ -206,6 +208,7 @@
           "start": 132,
           "end": 138
         },
+        "referencedSymbolId": 19,
         "children": []
       },
       {
@@ -316,6 +319,7 @@
           "start": 163,
           "end": 167
         },
+        "referencedSymbolId": 34,
         "children": []
       },
       {
@@ -356,6 +360,7 @@
           "start": 173,
           "end": 176
         },
+        "referencedSymbolId": 26,
         "children": []
       },
       {
@@ -457,6 +462,7 @@
           "start": 225,
           "end": 230
         },
+        "referencedSymbolId": 11,
         "children": []
       },
       {
@@ -466,6 +472,7 @@
           "start": 231,
           "end": 234
         },
+        "referencedSymbolId": 26,
         "children": []
       }
     ]

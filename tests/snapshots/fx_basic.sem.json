@@ -68,6 +68,7 @@
           "start": 7,
           "end": 11
         },
+        "referencedSymbolId": 13,
         "children": []
       },
       {
@@ -108,6 +109,7 @@
           "start": 19,
           "end": 20
         },
+        "referencedSymbolId": 7,
         "children": []
       },
       {
@@ -191,6 +193,7 @@
           "start": 56,
           "end": 57
         },
+        "referencedSymbolId": 7,
         "children": []
       },
       {
@@ -406,6 +409,7 @@
           "start": 140,
           "end": 147
         },
+        "referencedSymbolId": 13,
         "children": [
           {
             "role": "callee",
@@ -420,6 +424,7 @@
           "start": 140,
           "end": 144
         },
+        "referencedSymbolId": 13,
         "children": []
       },
       {
@@ -529,6 +534,7 @@
           "start": 186,
           "end": 193
         },
+        "referencedSymbolId": 13,
         "children": [
           {
             "role": "callee",
@@ -543,6 +549,7 @@
           "start": 186,
           "end": 190
         },
+        "referencedSymbolId": 13,
         "children": []
       },
       {

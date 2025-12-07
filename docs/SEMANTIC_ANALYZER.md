@@ -28,7 +28,7 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
 ## Output schema (semantic JSON)
 - `formatVersion`: integer, currently `3`.
 - `profile`: selected profile string (e.g., `ps_4_0`).
-- `syntax`: `{ rootId, nodes[] }` where `nodes` is a flattened list of `{ id, kind, span, children: [{ role, nodeId }] }` covering the parsed AST (statements/expressions/decls); spans are start/end offsets.
+- `syntax`: `{ rootId, nodes[] }` where `nodes` is a flattened list of `{ id, kind, span, referencedSymbolId, children: [{ role, nodeId }] }` covering the parsed AST (statements/expressions/decls); spans are start/end offsets. `referencedSymbolId` is populated for identifiers/calls/member access when the name resolves to a known symbol.
 - `symbols`: functions, parameters, locals, globals, structs, resources, cbuffers/tbuffers, structured/RW buffers; includes semantics and parent links.
 - `types`: normalized types per node id (scalars, vectors, matrices, arrays, resources, functions).
 - `entryPoints`: resolved entry with stage derived from profile and symbol id.
