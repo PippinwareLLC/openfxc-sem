@@ -46,7 +46,7 @@ var json = JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteInd
   - SM<4: SV_* blocked on params/returns (stage-aware); pixel returns must be COLOR/DEPTH; diagnostics HLSL3002/3003/3004 as applicable.
   - SM4/5: SV_* validated per stage (e.g., VS return SV_Position; PS return SV_Target/Depth/Coverage; PS params may use SV_Position/SV_PrimitiveID/SV_SampleIndex/IsFrontFace/RTArrayIndex).
 - **Entry points**: resolved by name (or fallback with diagnostic), stage inferred from profile.
-- **FX stance**: techniques/passes are parsed into `techniques[]` (bindings + states). Diagnostics cover missing VS/PS bindings, duplicate technique/pass names, and profile/stage mismatches on bindings.
+- **FX stance**: techniques/passes are parsed into `techniques[]` (bindings + states). FX9 `compile` assignments and FX10 `Set*Shader(CompileShader())` forms populate per-pass shader bindings; render/state blocks are captured as assignments. Diagnostics cover missing VS/PS bindings, duplicate technique/pass names, and profile/stage mismatches on bindings; shared/pool/state objects surface as symbols when referenced.
 - **Profiles**: SM1-SM5 supported; stage derived from profile prefix (vs/ps/gs/hs/ds/cs). Profile info is carried through symbols/types/entryPoints.
 - **Diagnostics** (IDs stable):
   - HLSL100x: duplicates (e.g., duplicate function).

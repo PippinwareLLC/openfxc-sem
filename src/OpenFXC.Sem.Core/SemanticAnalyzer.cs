@@ -269,7 +269,7 @@ internal static class FxModelBuilder
                     continue;
                 }
 
-                if (TryParseState(statement, out var state))
+                if (TryParseState(statement, symbols, out var state))
                 {
                     states.Add(state);
                 }
@@ -289,18 +289,27 @@ internal static class FxModelBuilder
     private static bool TryParseShaderBinding(IReadOnlyList<TokenInfo> tokens, List<SymbolInfo> symbols, out FxShaderBinding shader)
     {
         shader = new FxShaderBinding();
-        if (tokens.Count < 5) return false;
+        if (tokens.Count == 0) return false;
 
         var stage = StageFromIdentifier(tokens[0].Text);
         if (stage is null) return false;
 
-        if (!string.Equals(tokens[1].Text, "=", StringComparison.Ordinal)) return false;
-        if (!string.Equals(tokens[2].Text, "compile", StringComparison.OrdinalIgnoreCase)) return false;
+        var compileIdx = FindCompileIndex(tokens);
+        if (compileIdx < 0) return false;
 
-        var profile = tokens[3].Text;
-        var entry = tokens[4].Text;
+        if (!TryFindNextIdentifier(tokens, compileIdx + 1, out var profileIdx, out var profile))
+        {
+            return false;
+        }
+
+        TryFindNextIdentifier(tokens, profileIdx + 1, out _, out var entry);
+
         var symbolId = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
             && string.Equals(s.Name, entry, StringComparison.OrdinalIgnoreCase))?.Id;
+        if (symbolId is null && LooksLikeIdentifier(entry))
+        {
+            symbolId = EnsureSymbol(symbols, entry, "Function", "void()");
+        }
 
         shader = new FxShaderBinding
         {
@@ -309,21 +318,52 @@ internal static class FxModelBuilder
             Entry = entry,
             EntrySymbolId = symbolId
         };
-        return true;
+        return !string.IsNullOrWhiteSpace(profile) && !string.IsNullOrWhiteSpace(entry);
     }
 
-    private static bool TryParseState(IReadOnlyList<TokenInfo> tokens, out FxStateAssignment state)
+    private static bool TryParseState(IReadOnlyList<TokenInfo> tokens, List<SymbolInfo> symbols, out FxStateAssignment state)
     {
         state = new FxStateAssignment();
-        if (tokens.Count < 3) return false;
-        if (!string.Equals(tokens[1].Text, "=", StringComparison.Ordinal)) return false;
+        if (tokens.Count == 0) return false;
 
-        state = new FxStateAssignment
+        // FX9-style: Name = Value;
+        if (tokens.Count >= 3 && string.Equals(tokens[1].Text, "=", StringComparison.Ordinal))
         {
-            Name = tokens[0].Text,
-            Value = string.Join(" ", tokens.Skip(2).Select(t => t.Text))
-        };
-        return true;
+            var valueText = string.Join(" ", tokens.Skip(2).Select(t => t.Text));
+            state = new FxStateAssignment
+            {
+                Name = tokens[0].Text,
+                Value = valueText
+            };
+            if (LooksLikeIdentifier(valueText))
+            {
+                EnsureSymbol(symbols, valueText, "StateObject");
+            }
+            return true;
+        }
+
+        // FX10-style: SetState(value[, ...]);
+        if (tokens.Count >= 2 && string.Equals(tokens[1].Text, "(", StringComparison.Ordinal))
+        {
+            if (TryFindNextIdentifier(tokens, 2, out _, out var arg))
+            {
+                var name = tokens[0].Text.StartsWith("Set", StringComparison.OrdinalIgnoreCase)
+                    ? tokens[0].Text[3..]
+                    : tokens[0].Text;
+                state = new FxStateAssignment
+                {
+                    Name = name,
+                    Value = arg
+                };
+                if (LooksLikeIdentifier(arg))
+                {
+                    EnsureSymbol(symbols, arg, "StateObject");
+                }
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void Validate(List<FxTechniqueInfo> techniques, TypeInference inference)
@@ -399,13 +439,107 @@ internal static class FxModelBuilder
 
     private static string? StageFromIdentifier(string identifier)
     {
-        if (identifier.Equals("VertexShader", StringComparison.OrdinalIgnoreCase)) return "Vertex";
-        if (identifier.Equals("PixelShader", StringComparison.OrdinalIgnoreCase)) return "Pixel";
-        if (identifier.Equals("GeometryShader", StringComparison.OrdinalIgnoreCase)) return "Geometry";
-        if (identifier.Equals("HullShader", StringComparison.OrdinalIgnoreCase)) return "Hull";
-        if (identifier.Equals("DomainShader", StringComparison.OrdinalIgnoreCase)) return "Domain";
-        if (identifier.Equals("ComputeShader", StringComparison.OrdinalIgnoreCase)) return "Compute";
-        return null;
+        if (string.IsNullOrWhiteSpace(identifier)) return null;
+
+        var text = identifier.Trim();
+        if (text.StartsWith("Set", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[3..];
+        }
+
+        const int shaderSuffixLength = 6;
+        if (text.EndsWith("Shader", StringComparison.OrdinalIgnoreCase) && text.Length > shaderSuffixLength)
+        {
+            text = text[..^shaderSuffixLength];
+        }
+
+        return text.ToLowerInvariant() switch
+        {
+            "vertex" or "vs" => "Vertex",
+            "pixel" or "ps" => "Pixel",
+            "geometry" or "gs" => "Geometry",
+            "hull" or "hs" => "Hull",
+            "domain" or "ds" => "Domain",
+            "compute" or "cs" => "Compute",
+            _ => null
+        };
+    }
+
+    private static int EnsureSymbol(List<SymbolInfo> symbols, string? name, string kind, string? type = null)
+    {
+        var existing = symbols.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.Name) && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (existing?.Id is int id)
+        {
+            return id;
+        }
+
+        var newId = AllocateSymbolId(symbols);
+        symbols.Add(new SymbolInfo
+        {
+            Id = newId,
+            Kind = kind,
+            Name = name,
+            Type = type,
+            DeclNodeId = null
+        });
+        return newId;
+    }
+
+    private static int AllocateSymbolId(List<SymbolInfo> symbols)
+    {
+        var maxId = symbols.Where(s => s.Id is not null).Select(s => s.Id!.Value).DefaultIfEmpty(0).Max();
+        return maxId + 1;
+    }
+
+    private static int FindCompileIndex(IReadOnlyList<TokenInfo> tokens)
+    {
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            var text = tokens[i].Text;
+            if (text.Equals("compile", StringComparison.OrdinalIgnoreCase)
+                || text.Equals("compileshader", StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool TryFindNextIdentifier(IReadOnlyList<TokenInfo> tokens, int startIndex, out int index, out string? text)
+    {
+        index = -1;
+        text = null;
+
+        for (var i = startIndex; i < tokens.Count; i++)
+        {
+            var current = tokens[i].Text;
+            if (IsDelimiter(current) || string.Equals(current, "=", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            index = i;
+            text = current;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsDelimiter(string text) => text is "(" or ")" or "{" or "}" or "[" or "]" or "," or ";";
+
+    private static bool LooksLikeIdentifier(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var trimmed = text.Trim();
+        if (trimmed.Equals("true", StringComparison.OrdinalIgnoreCase) || trimmed.Equals("false", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) return false;
+        if (trimmed.All(char.IsDigit)) return false;
+        return char.IsLetter(trimmed[0]) || trimmed[0] == '_';
     }
 
     private static NodeInfo? GetChildNode(NodeInfo node, string role)
@@ -633,6 +767,11 @@ internal static class SymbolBuilder
         }
         var semantic = ParseSemanticString(tokens.GetAnnotationText(node));
 
+        if (node.Span is not null && (name is null || type is null || TokenLookup.IsModifier(type) || string.Equals(name, type, StringComparison.OrdinalIgnoreCase)))
+        {
+            (name, type) = tokens.InferParameterNameAndType(node.Span.Value, fallbackName: name, fallbackType: type);
+        }
+
         var kind = parentKind switch
         {
             "CompilationUnit" => ClassifyGlobalKind(type),
@@ -673,6 +812,10 @@ internal static class SymbolBuilder
         if (!string.IsNullOrWhiteSpace(type) && (type.StartsWith("texture", StringComparison.OrdinalIgnoreCase) || type.Contains("buffer", StringComparison.OrdinalIgnoreCase)))
         {
             return "Resource";
+        }
+        if (!string.IsNullOrWhiteSpace(type) && type.Contains("state", StringComparison.OrdinalIgnoreCase))
+        {
+            return "StateObject";
         }
         return "GlobalVariable";
     }
@@ -999,7 +1142,22 @@ internal sealed class TokenLookup
     {
         return string.Equals(text, "in", StringComparison.OrdinalIgnoreCase)
             || string.Equals(text, "out", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(text, "inout", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(text, "inout", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "uniform", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "static", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "extern", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "shared", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "volatile", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "const", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "linear", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "centroid", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "nointerpolation", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "noperspective", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "sample", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "precise", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "row_major", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "column_major", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(text, "inline", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsDelimiter(string text)
