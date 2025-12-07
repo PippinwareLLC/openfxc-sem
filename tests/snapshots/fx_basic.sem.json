@@ -69,6 +69,7 @@
           "end": 11
         },
         "referencedSymbolId": 13,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -110,6 +111,7 @@
           "end": 20
         },
         "referencedSymbolId": 7,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -194,6 +196,7 @@
           "end": 57
         },
         "referencedSymbolId": 7,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -323,6 +326,7 @@
           "start": 110,
           "end": 132
         },
+        "operator": "=",
         "children": [
           {
             "role": "left",
@@ -410,6 +414,9 @@
           "end": 147
         },
         "referencedSymbolId": 13,
+        "referencedSymbolKind": "Function",
+        "calleeName": "main",
+        "calleeKind": "User",
         "children": [
           {
             "role": "callee",
@@ -425,6 +432,7 @@
           "end": 144
         },
         "referencedSymbolId": 13,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -448,6 +456,7 @@
           "start": 157,
           "end": 178
         },
+        "operator": "=",
         "children": [
           {
             "role": "left",
@@ -535,6 +544,9 @@
           "end": 193
         },
         "referencedSymbolId": 13,
+        "referencedSymbolKind": "Function",
+        "calleeName": "main",
+        "calleeKind": "User",
         "children": [
           {
             "role": "callee",
@@ -550,6 +562,7 @@
           "end": 190
         },
         "referencedSymbolId": 13,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -573,6 +586,7 @@
           "start": 203,
           "end": 217
         },
+        "operator": "=",
         "children": [
           {
             "role": "left",

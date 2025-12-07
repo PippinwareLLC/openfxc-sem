@@ -52,6 +52,7 @@
           "end": 16
         },
         "referencedSymbolId": 3,
+        "referencedSymbolKind": "CBuffer",
         "children": []
       },
       {
@@ -89,6 +90,7 @@
           "end": 87
         },
         "referencedSymbolId": 11,
+        "referencedSymbolKind": "Struct",
         "children": []
       },
       {
@@ -144,6 +146,7 @@
           "end": 104
         },
         "referencedSymbolId": 9,
+        "referencedSymbolKind": "StructMember",
         "children": []
       },
       {
@@ -216,6 +219,7 @@
           "end": 132
         },
         "referencedSymbolId": 34,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -253,6 +257,7 @@
           "end": 143
         },
         "referencedSymbolId": 16,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -335,6 +340,7 @@
           "end": 173
         },
         "referencedSymbolId": 27,
+        "referencedSymbolKind": "LocalVariable",
         "children": []
       },
       {
@@ -344,6 +350,8 @@
           "start": 176,
           "end": 198
         },
+        "calleeName": "mul",
+        "calleeKind": "Intrinsic",
         "children": [
           {
             "role": "callee",
@@ -376,6 +384,8 @@
           "end": 189
         },
         "referencedSymbolId": 9,
+        "referencedSymbolKind": "StructMember",
+        "swizzle": "pos",
         "children": [
           {
             "role": "expression",
@@ -395,6 +405,7 @@
           "end": 185
         },
         "referencedSymbolId": 16,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -405,6 +416,7 @@
           "end": 189
         },
         "referencedSymbolId": 9,
+        "referencedSymbolKind": "StructMember",
         "children": []
       },
       {
@@ -437,6 +449,7 @@
           "start": 210,
           "end": 219
         },
+        "operator": "*",
         "children": [
           {
             "role": "left",
@@ -460,6 +473,7 @@
           "end": 211
         },
         "referencedSymbolId": 27,
+        "referencedSymbolKind": "LocalVariable",
         "children": []
       },
       {

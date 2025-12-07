@@ -56,6 +56,7 @@
           "end": 16
         },
         "referencedSymbolId": 3,
+        "referencedSymbolKind": "CBuffer",
         "children": []
       },
       {
@@ -106,6 +107,7 @@
           "end": 88
         },
         "referencedSymbolId": 11,
+        "referencedSymbolKind": "Resource",
         "children": []
       },
       {
@@ -209,6 +211,7 @@
           "end": 138
         },
         "referencedSymbolId": 19,
+        "referencedSymbolKind": "Resource",
         "children": []
       },
       {
@@ -320,6 +323,7 @@
           "end": 167
         },
         "referencedSymbolId": 34,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -361,6 +365,7 @@
           "end": 176
         },
         "referencedSymbolId": 26,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -463,6 +468,7 @@
           "end": 230
         },
         "referencedSymbolId": 11,
+        "referencedSymbolKind": "Resource",
         "children": []
       },
       {
@@ -473,6 +479,7 @@
           "end": 234
         },
         "referencedSymbolId": 26,
+        "referencedSymbolKind": "Parameter",
         "children": []
       }
     ]

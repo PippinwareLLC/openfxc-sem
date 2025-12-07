@@ -65,6 +65,7 @@
           "end": 11
         },
         "referencedSymbolId": 13,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -106,6 +107,7 @@
           "end": 22
         },
         "referencedSymbolId": 7,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -190,6 +192,7 @@
           "end": 68
         },
         "referencedSymbolId": 7,
+        "referencedSymbolKind": "Parameter",
         "children": []
       }
     ]

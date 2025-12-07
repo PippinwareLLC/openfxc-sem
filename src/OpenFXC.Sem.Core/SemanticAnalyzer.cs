@@ -97,6 +97,9 @@ public sealed class SemanticAnalyzer
             .Where(s => s.Id is not null && !string.IsNullOrWhiteSpace(s.Name))
             .GroupBy(s => s.Name!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().Id!.Value, StringComparer.OrdinalIgnoreCase);
+        var symbolKindById = symbols
+            .Where(s => s.Id is not null && !string.IsNullOrWhiteSpace(s.Kind))
+            .ToDictionary(s => s.Id!.Value, s => s.Kind!);
 
         void Traverse(NodeInfo node)
         {
@@ -109,6 +112,11 @@ public sealed class SemanticAnalyzer
                 .ToList();
 
             int? referencedSymbolId = null;
+            string? referencedSymbolKind = null;
+            string? op = null;
+            string? swizzle = null;
+            string? calleeName = null;
+            string? calleeKind = null;
 
             if (string.Equals(node.Kind, "Identifier", StringComparison.OrdinalIgnoreCase))
             {
@@ -116,16 +124,19 @@ public sealed class SemanticAnalyzer
                 if (name is not null && symbolLookup.TryGetValue(name, out var symId))
                 {
                     referencedSymbolId = symId;
+                    symbolKindById.TryGetValue(symId, out referencedSymbolKind);
                 }
             }
             else if (string.Equals(node.Kind, "CallExpression", StringComparison.OrdinalIgnoreCase))
             {
                 var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
-                var calleeName = callee is null ? null : tokens.GetText(callee.Span);
+                calleeName = callee is null ? null : tokens.GetText(callee.Span);
                 if (calleeName is not null && symbolLookup.TryGetValue(calleeName, out var symId))
                 {
                     referencedSymbolId = symId;
+                    symbolKindById.TryGetValue(symId, out referencedSymbolKind);
                 }
+                calleeKind = calleeName is not null && Intrinsics.IsIntrinsic(calleeName) ? "Intrinsic" : "User";
             }
             else if (string.Equals(node.Kind, "MemberAccessExpression", StringComparison.OrdinalIgnoreCase))
             {
@@ -134,7 +145,23 @@ public sealed class SemanticAnalyzer
                 if (!string.IsNullOrWhiteSpace(memberName) && symbolLookup.TryGetValue(memberName!, out var symId))
                 {
                     referencedSymbolId = symId;
+                    symbolKindById.TryGetValue(symId, out referencedSymbolKind);
                 }
+                swizzle = memberName;
+            }
+            else if (string.Equals(node.Kind, "UnaryExpression", StringComparison.OrdinalIgnoreCase))
+            {
+                var opNode = node.Children.FirstOrDefault(c => string.Equals(c.Role, "operator", StringComparison.OrdinalIgnoreCase)).Node;
+                op = opNode is null ? null : tokens.GetText(opNode.Span);
+            }
+            else if (string.Equals(node.Kind, "BinaryExpression", StringComparison.OrdinalIgnoreCase))
+            {
+                var opNode = node.Children.FirstOrDefault(c => string.Equals(c.Role, "operator", StringComparison.OrdinalIgnoreCase)).Node;
+                op = opNode is null ? null : tokens.GetText(opNode.Span);
+            }
+            else if (string.Equals(node.Kind, "CastExpression", StringComparison.OrdinalIgnoreCase))
+            {
+                op = "cast";
             }
 
             nodes.Add(new SyntaxNodeInfo
@@ -143,7 +170,12 @@ public sealed class SemanticAnalyzer
                 Kind = node.Kind ?? string.Empty,
                 Span = node.Span is null ? null : new SyntaxSpan { Start = node.Span.Value.Start, End = node.Span.Value.End },
                 Children = children,
-                ReferencedSymbolId = referencedSymbolId
+                ReferencedSymbolId = referencedSymbolId,
+                ReferencedSymbolKind = referencedSymbolKind,
+                Operator = op,
+                Swizzle = swizzle,
+                CalleeName = calleeName,
+                CalleeKind = calleeKind
             });
 
             foreach (var child in node.Children)
@@ -2434,6 +2466,21 @@ public sealed record SyntaxNodeInfo
 
     [JsonPropertyName("referencedSymbolId")]
     public int? ReferencedSymbolId { get; init; }
+
+    [JsonPropertyName("referencedSymbolKind")]
+    public string? ReferencedSymbolKind { get; init; }
+
+    [JsonPropertyName("operator")]
+    public string? Operator { get; init; }
+
+    [JsonPropertyName("swizzle")]
+    public string? Swizzle { get; init; }
+
+    [JsonPropertyName("calleeName")]
+    public string? CalleeName { get; init; }
+
+    [JsonPropertyName("calleeKind")]
+    public string? CalleeKind { get; init; }
 
     [JsonPropertyName("children")]
     public IReadOnlyList<SyntaxNodeChild> Children { get; init; } = Array.Empty<SyntaxNodeChild>();

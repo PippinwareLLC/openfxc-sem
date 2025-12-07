@@ -57,6 +57,7 @@
           "end": 11
         },
         "referencedSymbolId": 3,
+        "referencedSymbolKind": "Sampler",
         "children": []
       },
       {
@@ -106,6 +107,7 @@
           "end": 25
         },
         "referencedSymbolId": 19,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -147,6 +149,7 @@
           "end": 35
         },
         "referencedSymbolId": 10,
+        "referencedSymbolKind": "Parameter",
         "children": []
       },
       {
@@ -230,6 +233,8 @@
           "start": 74,
           "end": 87
         },
+        "calleeName": "tex2D",
+        "calleeKind": "Intrinsic",
         "children": [
           {
             "role": "callee",
@@ -262,6 +267,7 @@
           "end": 81
         },
         "referencedSymbolId": 3,
+        "referencedSymbolKind": "Sampler",
         "children": []
       },
       {
@@ -272,6 +278,7 @@
           "end": 85
         },
         "referencedSymbolId": 10,
+        "referencedSymbolKind": "Parameter",
         "children": []
       }
     ]

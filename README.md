@@ -60,7 +60,7 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
 
 ## Semantic Model (output)
 High-level shape of `output.sem.json`:
-- Metadata: `formatVersion`, selected `profile`, and syntax info (`rootId` plus flattened `nodes` with kind/children/spans and `referencedSymbolId` for lowering).
+- Metadata: `formatVersion`, selected `profile`, and syntax info (`rootId` plus flattened `nodes` with kind/children/spans, `referencedSymbolId`/`referencedSymbolKind`, operator/swizzle, and callee metadata for lowering).
 - Symbols: functions, parameters, locals, globals, structs/typedefs, samplers/resources, and cbuffers/tbuffers (SM4/5).
 - Types: assigned to every declaration and expression.
 - Entry points: resolved function, stage inferred from profile, entry metadata.

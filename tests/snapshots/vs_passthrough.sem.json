@@ -65,6 +65,7 @@
           "end": 22
         },
         "referencedSymbolId": 3,
+        "referencedSymbolKind": "GlobalVariable",
         "children": []
       },
       {
@@ -102,6 +103,7 @@
           "end": 48
         },
         "referencedSymbolId": 6,
+        "referencedSymbolKind": "Sampler",
         "children": []
       },
       {
@@ -130,6 +132,7 @@
           "end": 65
         },
         "referencedSymbolId": 14,
+        "referencedSymbolKind": "Struct",
         "children": []
       },
       {
@@ -185,6 +188,7 @@
           "end": 82
         },
         "referencedSymbolId": 12,
+        "referencedSymbolKind": "StructMember",
         "children": []
       },
       {
@@ -257,6 +261,7 @@
           "end": 111
         },
         "referencedSymbolId": 30,
+        "referencedSymbolKind": "Function",
         "children": []
       },
       {
@@ -298,6 +303,7 @@
           "end": 122
         },
         "referencedSymbolId": 12,
+        "referencedSymbolKind": "StructMember",
         "children": []
       },
       {
@@ -381,6 +387,8 @@
           "start": 160,
           "end": 184
         },
+        "calleeName": "mul",
+        "calleeKind": "Intrinsic",
         "children": [
           {
             "role": "callee",
@@ -413,6 +421,7 @@
           "end": 167
         },
         "referencedSymbolId": 12,
+        "referencedSymbolKind": "StructMember",
         "children": []
       },
       {
@@ -423,6 +432,7 @@
           "end": 182
         },
         "referencedSymbolId": 3,
+        "referencedSymbolKind": "GlobalVariable",
         "children": []
       }
     ]
