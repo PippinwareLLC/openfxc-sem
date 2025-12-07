@@ -403,9 +403,9 @@ internal static class FxModelBuilder
                 inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
             }
 
-        if (hasVs ^ hasPs)
-        {
-                inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a {(hasVs ? "Pixel" : "Vertex")} shader binding.", pass.Span);
+            if (hasVs && !hasPs)
+            {
+                inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span);
             }
 
             // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
