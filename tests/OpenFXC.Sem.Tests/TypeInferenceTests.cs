@@ -230,7 +230,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
         var diagnostics = doc.RootElement.GetProperty("diagnostics").EnumerateArray().ToList();
-        Assert.Contains(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
+        Assert.DoesNotContain(diagnostics, d => d.GetProperty("id").GetString() == "HLSL2001");
     }
 
     [Fact]

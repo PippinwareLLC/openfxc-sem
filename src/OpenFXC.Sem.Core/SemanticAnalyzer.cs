@@ -453,16 +453,28 @@ internal static class FxModelBuilder
             text = text[..^shaderSuffixLength];
         }
 
-        return text.ToLowerInvariant() switch
+        var lower = text.ToLowerInvariant();
+        if (lower.Contains("geometry")) return "Geometry";
+        if (lower.Contains("hull")) return "Hull";
+        if (lower.Contains("domain")) return "Domain";
+        if (lower.Contains("compute")) return "Compute";
+        if (lower.Contains("pixel")) return "Pixel";
+        if (lower.Contains("vertex")) return "Vertex";
+        if (lower is "vs" or "ps" or "gs" or "hs" or "ds" or "cs")
         {
-            "vertex" or "vs" => "Vertex",
-            "pixel" or "ps" => "Pixel",
-            "geometry" or "gs" => "Geometry",
-            "hull" or "hs" => "Hull",
-            "domain" or "ds" => "Domain",
-            "compute" or "cs" => "Compute",
-            _ => null
-        };
+            return lower switch
+            {
+                "vs" => "Vertex",
+                "ps" => "Pixel",
+                "gs" => "Geometry",
+                "hs" => "Hull",
+                "ds" => "Domain",
+                "cs" => "Compute",
+                _ => null
+            };
+        }
+
+        return null;
     }
 
     private static int EnsureSymbol(List<SymbolInfo> symbols, string? name, string kind, string? type = null)
@@ -1271,13 +1283,15 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
         new IntrinsicSignature { Name = "tex2Dlod", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
-        new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) }
+        new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
+        new IntrinsicSignature { Name = "maxvertexcount", Parameters = new [] { SemType.Scalar("int") }, ReturnResolver = _ => SemType.Scalar("int") },
+        new IntrinsicSignature { Name = "append", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = _ => SemType.Scalar("void") }
     };
 
-    public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics = false)
     {
         var normalizedName = NormalizeName(name);
-        var dynamic = ResolveDynamic(normalizedName, args, inference, span);
+        var dynamic = ResolveDynamic(normalizedName, args, inference, span, suppressDiagnostics);
         if (dynamic is not null)
         {
             return dynamic;
@@ -1347,24 +1361,25 @@ internal static class Intrinsics
         || name.StartsWith("tex", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("sample", StringComparison.OrdinalIgnoreCase);
 
-    private static SemType? ResolveDynamic(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveDynamic(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         var lower = name.ToLowerInvariant();
         return lower switch
         {
-            "mul" => ResolveMul(args, inference, span),
-            "dot" => ResolveDot(args, inference, span),
-            "normalize" => ResolveNormalize(args, inference, span),
-            "saturate" => ResolveSaturate(args, inference, span),
-            "pow" => ResolvePow(args, inference, span),
-            "length" => ResolveLength(args, inference, span) ?? ResolveFromCatalog(lower, args, inference, span),
-            var t when t.StartsWith("tex", StringComparison.OrdinalIgnoreCase) => ResolveTexture(t, args, inference, span),
+            "mul" => ResolveMul(args, inference, span, suppressDiagnostics),
+            "dot" => ResolveDot(args, inference, span, suppressDiagnostics),
+            "normalize" => ResolveNormalize(args, inference, span, suppressDiagnostics),
+            "saturate" => ResolveSaturate(args, inference, span, suppressDiagnostics),
+            "pow" => ResolvePow(args, inference, span, suppressDiagnostics),
+            "length" => ResolveLength(args, inference, span, suppressDiagnostics) ?? ResolveFromCatalog(lower, args, inference, span, suppressDiagnostics),
+            "maxvertexcount" => ResolveMaxVertexCount(args),
+            var t when t.StartsWith("tex", StringComparison.OrdinalIgnoreCase) => ResolveTexture(t, args, inference, span, suppressDiagnostics),
             var s when s.StartsWith("sample", StringComparison.OrdinalIgnoreCase) => ResolveSample(args),
             _ => null
         };
     }
 
-    private static SemType? ResolveFromCatalog(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveFromCatalog(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics = false)
     {
         var matches = Catalog.Where(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
         foreach (var sig in matches)
@@ -1393,11 +1408,14 @@ internal static class Intrinsics
             return sig.ReturnResolver(args.Select((a, i) => a ?? sig.Parameters[i]).ToList());
         }
 
-        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+        }
         return null;
     }
 
-    private static SemType? ResolveMul(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveMul(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count != 2) return null;
         if (args[0] is null || args[1] is null) return null;
@@ -1426,11 +1444,14 @@ internal static class Intrinsics
             return promoted;
         }
 
-        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'mul'.", span);
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'mul'.", span);
+        }
         return null;
     }
 
-    private static SemType? ResolveDot(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveDot(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count != 2 || args[0] is null || args[1] is null) return null;
         var a = args[0]!;
@@ -1440,11 +1461,14 @@ internal static class Intrinsics
             return SemType.Scalar(PromoteBase(a.BaseType, b.BaseType));
         }
 
-        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'dot'.", span);
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'dot'.", span);
+        }
         return null;
     }
 
-    private static SemType? ResolveNormalize(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveNormalize(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count != 1 || args[0] is null) return null;
         var a = args[0]!;
@@ -1453,11 +1477,14 @@ internal static class Intrinsics
             return a;
         }
 
-        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'normalize'.", span);
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'normalize'.", span);
+        }
         return null;
     }
 
-    private static SemType? ResolveSaturate(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveSaturate(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count != 1 || args[0] is null) return null;
         var a = args[0]!;
@@ -1466,18 +1493,24 @@ internal static class Intrinsics
             return a;
         }
 
-        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'saturate'.", span);
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'saturate'.", span);
+        }
         return null;
     }
 
-    private static SemType? ResolvePow(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolvePow(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count != 2 || args[0] is null || args[1] is null) return null;
         var a = args[0]!;
         var b = args[1]!;
         if (!a.IsNumeric || !b.IsNumeric)
         {
-            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'pow'.", span);
+            if (!suppressDiagnostics)
+            {
+                inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'pow'.", span);
+            }
             return null;
         }
 
@@ -1494,7 +1527,7 @@ internal static class Intrinsics
         return SemType.Scalar(PromoteBase(a.BaseType, b.BaseType));
     }
 
-    private static SemType? ResolveLength(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveLength(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count != 1 || args[0] is null) return null;
         var a = args[0]!;
@@ -1506,18 +1539,24 @@ internal static class Intrinsics
         return null;
     }
 
-    private static SemType? ResolveTexture(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    private static SemType? ResolveTexture(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
     {
         if (args.Count < 2)
         {
-            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            if (!suppressDiagnostics)
+            {
+                inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            }
             return null;
         }
 
         var sampler = args[0];
-        if (sampler is null || sampler.Kind != TypeKind.Resource || !IsSampler(sampler.BaseType))
+        if (sampler is null || sampler.Kind != TypeKind.Resource || !IsSamplerOrTexture(sampler.BaseType))
         {
-            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            if (!suppressDiagnostics)
+            {
+                inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            }
             return null;
         }
 
@@ -1530,10 +1569,20 @@ internal static class Intrinsics
         return SemType.Vector("float", 4);
     }
 
+    private static SemType? ResolveMaxVertexCount(IReadOnlyList<SemType?> args)
+    {
+        if (args.Count == 1 && args[0] is not null && args[0]!.IsNumeric)
+        {
+            return SemType.Scalar("int");
+        }
+        return SemType.Scalar("int");
+    }
+
     private static string PromoteBase(string a, string b) => TypeCompatibility.PromoteBinary(SemType.Scalar(a), SemType.Scalar(b))?.BaseType ?? a;
 
-    private static bool IsSampler(string name) =>
-        name.Contains("sampler", StringComparison.OrdinalIgnoreCase);
+    private static bool IsSamplerOrTexture(string name) =>
+        name.Contains("sampler", StringComparison.OrdinalIgnoreCase)
+        || name.Contains("texture", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed record SemType
@@ -1984,11 +2033,6 @@ internal static class ExpressionTypeAnalyzer
         {
             var enteringFx = inFxScope || node.Kind is "TechniqueDeclaration" or "Technique10Declaration" or "TechniqueBody" or "PassDeclaration";
 
-            if (enteringFx)
-            {
-                return;
-            }
-
             foreach (var child in node.Children)
             {
                 Traverse(child.Node, enteringFx);
@@ -2007,7 +2051,7 @@ internal static class ExpressionTypeAnalyzer
                         {
                             // Intrinsic or type name will be handled by call/constructor inference; suppress unknown-id diagnostic here.
                         }
-                        else
+                        else if (!enteringFx)
                         {
                             typeInference.AddDiagnostic("HLSL2005", $"Unknown identifier '{name ?? "<unknown>"}'.", node.Span);
                         }
@@ -2027,7 +2071,7 @@ internal static class ExpressionTypeAnalyzer
                     }
                     break;
                 case "CallExpression":
-                    InferCall(node, tokens, symbolTypes, typeInference, types);
+                    InferCall(node, tokens, symbolTypes, typeInference, types, enteringFx);
                     break;
                 case "BinaryExpression":
                     InferBinary(node, typeInference, types);
@@ -2053,7 +2097,7 @@ internal static class ExpressionTypeAnalyzer
         }
     }
 
-    private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, SemType?> symbolTypes, TypeInference typeInference, List<TypeInfo> types)
+    private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, SemType?> symbolTypes, TypeInference typeInference, List<TypeInfo> types, bool suppressDiagnostics)
     {
         var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
         var calleeName = callee is null ? null : tokens.GetText(callee.Span);
@@ -2064,14 +2108,14 @@ internal static class ExpressionTypeAnalyzer
         if (!string.IsNullOrWhiteSpace(calleeName))
         {
             // Intrinsic resolution first.
-            inferred = Intrinsics.Resolve(calleeName!, argTypes, typeInference, node.Span);
+            inferred = Intrinsics.Resolve(calleeName!, argTypes, typeInference, node.Span, suppressDiagnostics);
 
             if (inferred is null)
             {
                 if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Kind == TypeKind.Function)
                 {
                     inferred = fnType.ReturnType;
-                    CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference, node.Span);
+                    CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference, node.Span, suppressDiagnostics);
                 }
                 else
                 {
@@ -2079,7 +2123,7 @@ internal static class ExpressionTypeAnalyzer
                     if (ctorType is not null)
                     {
                         inferred = ctorType;
-                        CheckConstructorArguments(calleeName!, ctorType, argTypes, typeInference, node.Span);
+                        CheckConstructorArguments(calleeName!, ctorType, argTypes, typeInference, node.Span, suppressDiagnostics);
                     }
                 }
             }
@@ -2092,12 +2136,15 @@ internal static class ExpressionTypeAnalyzer
         AddType(types, typeInference, node.Id, inferred);
     }
 
-    private static void CheckCallCompatibility(string calleeName, SemType functionType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span)
+    private static void CheckCallCompatibility(string calleeName, SemType functionType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span, bool suppressDiagnostics)
     {
         var parameters = functionType.ParameterTypes ?? Array.Empty<SemType>();
         if (parameters.Count != args.Count)
         {
-            typeInference.AddDiagnostic("HLSL2001", $"Function '{calleeName}' expects {parameters.Count} arguments but got {args.Count}.", span);
+            if (!suppressDiagnostics)
+            {
+                typeInference.AddDiagnostic("HLSL2001", $"Function '{calleeName}' expects {parameters.Count} arguments but got {args.Count}.", span);
+            }
             return;
         }
 
@@ -2107,13 +2154,16 @@ internal static class ExpressionTypeAnalyzer
             var param = parameters[i];
             if (arg is null || !TypeCompatibility.CanPromote(arg, param))
             {
-                typeInference.AddDiagnostic("HLSL2001", $"Cannot convert argument {i} to parameter of type '{param}'.", span);
+                if (!suppressDiagnostics)
+                {
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot convert argument {i} to parameter of type '{param}'.", span);
+                }
                 return;
             }
         }
     }
 
-        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span)
+        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span, bool suppressDiagnostics)
         {
             if (args.Count == 0) return;
 
@@ -2139,7 +2189,10 @@ internal static class ExpressionTypeAnalyzer
                 {
                     if (!ArgCompatible(arg, targetType.BaseType))
                     {
-                        typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                        if (!suppressDiagnostics)
+                        {
+                            typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                        }
                         return;
                     }
                     provided += CountComponents(arg);
@@ -2147,7 +2200,10 @@ internal static class ExpressionTypeAnalyzer
 
             if (provided != required)
             {
-                typeInference.AddDiagnostic("HLSL2001", $"Constructor '{calleeName}' expects {required} components but got {provided}.", span);
+                if (!suppressDiagnostics)
+                {
+                    typeInference.AddDiagnostic("HLSL2001", $"Constructor '{calleeName}' expects {required} components but got {provided}.", span);
+                }
             }
             return;
             }
@@ -2156,11 +2212,14 @@ internal static class ExpressionTypeAnalyzer
             {
                 if (!ArgCompatible(arg, targetType.BaseType))
                 {
-                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                    if (!suppressDiagnostics)
+                    {
+                        typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                    }
                     return;
                 }
             }
-    }
+        }
 
     private static int CountComponents(SemType? type) =>
         type is null

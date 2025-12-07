@@ -680,6 +680,22 @@
     {
       "nodeId": 10,
       "type": "float4"
+    },
+    {
+      "nodeId": 23,
+      "type": "float4(float4)"
+    },
+    {
+      "nodeId": 24,
+      "type": "float4"
+    },
+    {
+      "nodeId": 33,
+      "type": "float4(float4)"
+    },
+    {
+      "nodeId": 34,
+      "type": "float4"
     }
   ],
   "entryPoints": [
