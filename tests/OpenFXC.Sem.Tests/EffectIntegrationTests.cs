@@ -51,6 +51,23 @@ public class EffectIntegrationTests
         Assert.DoesNotContain(output.Diagnostics, d => string.Equals(d.Id, "HLSL3001", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void Technique_binding_drives_entry_selection()
+    {
+        var path = RepoPath("samples", "fx9", "technique_entry", "main.fx");
+        var astJson = ParseHelper.BuildAstJsonFromPath(path);
+        var analyzer = new SemanticAnalyzer("vs_2_0", "main", astJson);
+        var output = analyzer.Analyze();
+
+        var entry = Assert.Single(output.EntryPoints);
+        Assert.Equal("VSFunc", entry.Name);
+        Assert.Equal("Vertex", entry.Stage);
+        Assert.Equal("vs_2_0", entry.Profile);
+
+        Assert.DoesNotContain(output.Diagnostics, d => d.Id == "HLSL3001");
+        Assert.DoesNotContain(output.Diagnostics, d => d.Id == "HLSL2001");
+    }
+
     private static string RepoPath(params string[] parts)
     {
         var baseDir = AppContext.BaseDirectory;

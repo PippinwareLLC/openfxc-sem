@@ -42,9 +42,9 @@ public sealed class SemanticAnalyzer
                 rootNode = NodeInfo.FromJson(rootNodeEl);
                 var build = SymbolBuilder.Build(rootNode, tokens, _typeInference);
                 ExpressionTypeAnalyzer.Infer(rootNode, tokens, build.Symbols, build.Types, _typeInference);
-                entryPoints = EntryPointResolver.Resolve(build.Symbols, _entry, _profile, _typeInference, build.Spans);
-                SemanticValidator.Validate(build.Symbols, entryPoints, _profile, _typeInference, build.Spans);
                 techniques = FxModelBuilder.Build(rootNode, tokens, _typeInference, build.Symbols);
+                entryPoints = EntryPointResolver.Resolve(build.Symbols, techniques, _entry, _profile, _typeInference, build.Spans);
+                SemanticValidator.Validate(build.Symbols, entryPoints, _profile, _typeInference, build.Spans);
                 diagnostics.AddRange(_typeInference.Diagnostics);
                 symbols = build.Symbols;
                 types = build.Types;
@@ -1220,341 +1220,70 @@ internal static class Intrinsics
 {
     private static readonly IReadOnlyList<IntrinsicSignature> Catalog = new List<IntrinsicSignature>
     {
-        new IntrinsicSignature
-        {
-            Name = "dot",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
-            ReturnResolver = _ => SemType.Scalar("float")
-        },
-        new IntrinsicSignature
-        {
-            Name = "dot",
-            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) },
-            ReturnResolver = _ => SemType.Scalar("float")
-        },
-        new IntrinsicSignature
-        {
-            Name = "normalize",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "normalize",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "saturate",
-            Parameters = new [] { SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "saturate",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "saturate",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "saturate",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "mul",
-            Parameters = new [] { SemType.Matrix("float", 4, 4), SemType.Vector("float", 4) },
-            ReturnResolver = args => DetermineMulReturn(args)
-        },
-        new IntrinsicSignature
-        {
-            Name = "mul",
-            Parameters = new [] { SemType.Vector("float", 4), SemType.Matrix("float", 4, 4) },
-            ReturnResolver = args => DetermineMulReturn(args)
-        },
-        new IntrinsicSignature
-        {
-            Name = "mul",
-            Parameters = new [] { SemType.Matrix("float", 3, 3), SemType.Vector("float", 3) },
-            ReturnResolver = args => DetermineMulReturn(args)
-        },
-        new IntrinsicSignature
-        {
-            Name = "mul",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Matrix("float", 3, 3) },
-            ReturnResolver = args => DetermineMulReturn(args)
-        },
-        new IntrinsicSignature
-        {
-            Name = "tex2D",
-            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2) },
-            ReturnResolver = _ => SemType.Vector("float", 4)
-        },
-        new IntrinsicSignature
-        {
-            Name = "tex2D",
-            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 3) },
-            ReturnResolver = _ => SemType.Vector("float", 4)
-        },
-        new IntrinsicSignature
-        {
-            Name = "tex2Dlod",
-            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) },
-            ReturnResolver = _ => SemType.Vector("float", 4)
-        },
-        new IntrinsicSignature
-        {
-            Name = "tex2Dgrad",
-            Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) },
-            ReturnResolver = _ => SemType.Vector("float", 4)
-        },
-        new IntrinsicSignature
-        {
-            Name = "sin",
-            Parameters = new [] { SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "sin",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "sin",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "sin",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "cos",
-            Parameters = new [] { SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "cos",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "cos",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "cos",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "abs",
-            Parameters = new [] { SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "abs",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "abs",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "abs",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "length",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = _ => SemType.Scalar("float")
-        },
-        new IntrinsicSignature
-        {
-            Name = "length",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = _ => SemType.Scalar("float")
-        },
-        new IntrinsicSignature
-        {
-            Name = "length",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = _ => SemType.Scalar("float")
-        },
-        new IntrinsicSignature
-        {
-            Name = "cross",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
-            ReturnResolver = _ => SemType.Vector("float", 3)
-        },
-        new IntrinsicSignature
-        {
-            Name = "min",
-            Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "min",
-            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "min",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "min",
-            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "max",
-            Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "max",
-            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "max",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "max",
-            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "clamp",
-            Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float"), SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "clamp",
-            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "clamp",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "clamp",
-            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "lerp",
-            Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "lerp",
-            Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "lerp",
-            Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddx",
-            Parameters = new [] { SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddx",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddx",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddx",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddy",
-            Parameters = new [] { SemType.Scalar("float") },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddy",
-            Parameters = new [] { SemType.Vector("float", 2) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddy",
-            Parameters = new [] { SemType.Vector("float", 3) },
-            ReturnResolver = args => args.FirstOrDefault()
-        },
-        new IntrinsicSignature
-        {
-            Name = "ddy",
-            Parameters = new [] { SemType.Vector("float", 4) },
-            ReturnResolver = args => args.FirstOrDefault()
-        }
+        new IntrinsicSignature { Name = "sin", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "sin", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "sin", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "sin", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "cos", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "cos", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "cos", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "cos", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "length", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "length", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "length", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Scalar("float") },
+
+        new IntrinsicSignature { Name = "cross", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Vector("float", 3) },
+
+        new IntrinsicSignature { Name = "min", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "min", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "min", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "min", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "max", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "max", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "max", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "max", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "clamp", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "clamp", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "clamp", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "clamp", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "lerp", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "lerp", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "lerp", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "ddx", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "ddx", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "ddx", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "ddx", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "tex2Dlod", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
+        new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) }
     };
 
     public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
     {
-        var matches = Catalog.Where(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+        var normalizedName = NormalizeName(name);
+        var dynamic = ResolveDynamic(normalizedName, args, inference, span);
+        if (dynamic is not null)
+        {
+            return dynamic;
+        }
+
+        var matches = Catalog.Where(c => string.Equals(c.Name, normalizedName, StringComparison.OrdinalIgnoreCase)).ToList();
         if (matches.Count == 0)
         {
             return null;
@@ -1590,32 +1319,221 @@ internal static class Intrinsics
         return null;
     }
 
-    private static SemType? DetermineMulReturn(IReadOnlyList<SemType> args)
+    public static bool IsIntrinsic(string name)
+    {
+        var normalized = NormalizeName(name);
+        return Catalog.Any(c => string.Equals(c.Name, normalized, StringComparison.OrdinalIgnoreCase))
+            || IsDynamicName(normalized);
+    }
+
+    private static string NormalizeName(string name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Contains('.'))
+        {
+            var last = trimmed.Split('.').Last();
+            return string.IsNullOrWhiteSpace(last) ? trimmed : last;
+        }
+        return trimmed;
+    }
+
+    private static bool IsDynamicName(string name) =>
+        name.Equals("mul", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("dot", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("normalize", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("saturate", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("pow", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("length", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("tex", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("sample", StringComparison.OrdinalIgnoreCase);
+
+    private static SemType? ResolveDynamic(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        var lower = name.ToLowerInvariant();
+        return lower switch
+        {
+            "mul" => ResolveMul(args, inference, span),
+            "dot" => ResolveDot(args, inference, span),
+            "normalize" => ResolveNormalize(args, inference, span),
+            "saturate" => ResolveSaturate(args, inference, span),
+            "pow" => ResolvePow(args, inference, span),
+            "length" => ResolveLength(args, inference, span) ?? ResolveFromCatalog(lower, args, inference, span),
+            var t when t.StartsWith("tex", StringComparison.OrdinalIgnoreCase) => ResolveTexture(t, args, inference, span),
+            var s when s.StartsWith("sample", StringComparison.OrdinalIgnoreCase) => ResolveSample(args),
+            _ => null
+        };
+    }
+
+    private static SemType? ResolveFromCatalog(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        var matches = Catalog.Where(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var sig in matches)
+        {
+            if (sig.Parameters.Count != args.Count)
+            {
+                continue;
+            }
+
+            var compatible = true;
+            for (var i = 0; i < sig.Parameters.Count; i++)
+            {
+                var arg = args[i];
+                if (arg is null || !TypeCompatibility.CanPromote(arg, sig.Parameters[i]))
+                {
+                    compatible = false;
+                    break;
+                }
+            }
+
+            if (!compatible)
+            {
+                continue;
+            }
+
+            return sig.ReturnResolver(args.Select((a, i) => a ?? sig.Parameters[i]).ToList());
+        }
+
+        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+        return null;
+    }
+
+    private static SemType? ResolveMul(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
     {
         if (args.Count != 2) return null;
-        var a = args[0];
-        var b = args[1];
+        if (args[0] is null || args[1] is null) return null;
+
+        var a = args[0]!;
+        var b = args[1]!;
 
         if (a.Kind == TypeKind.Matrix && b.Kind == TypeKind.Vector && a.Columns == b.VectorSize)
         {
-            return SemType.Vector(a.BaseType, a.Rows);
+            return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), a.Rows);
         }
 
         if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Matrix && a.VectorSize == b.Rows)
         {
-            return SemType.Vector(b.BaseType, b.Columns);
+            return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), b.Columns);
         }
 
         if (a.Kind == TypeKind.Matrix && b.Kind == TypeKind.Matrix && a.Columns == b.Rows)
         {
-            return SemType.Matrix(a.BaseType, a.Rows, b.Columns);
+            return SemType.Matrix(PromoteBase(a.BaseType, b.BaseType), a.Rows, b.Columns);
         }
 
-        return b.Kind == TypeKind.Vector ? b : a;
+        var promoted = TypeCompatibility.PromoteBinary(a, b);
+        if (promoted is not null)
+        {
+            return promoted;
+        }
+
+        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'mul'.", span);
+        return null;
     }
 
-    public static bool IsIntrinsic(string name) =>
-        Catalog.Any(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+    private static SemType? ResolveDot(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        if (args.Count != 2 || args[0] is null || args[1] is null) return null;
+        var a = args[0]!;
+        var b = args[1]!;
+        if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Vector && a.VectorSize == b.VectorSize)
+        {
+            return SemType.Scalar(PromoteBase(a.BaseType, b.BaseType));
+        }
+
+        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'dot'.", span);
+        return null;
+    }
+
+    private static SemType? ResolveNormalize(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        if (args.Count != 1 || args[0] is null) return null;
+        var a = args[0]!;
+        if (a.IsNumeric)
+        {
+            return a;
+        }
+
+        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'normalize'.", span);
+        return null;
+    }
+
+    private static SemType? ResolveSaturate(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        if (args.Count != 1 || args[0] is null) return null;
+        var a = args[0]!;
+        if (a.IsNumeric)
+        {
+            return a;
+        }
+
+        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'saturate'.", span);
+        return null;
+    }
+
+    private static SemType? ResolvePow(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        if (args.Count != 2 || args[0] is null || args[1] is null) return null;
+        var a = args[0]!;
+        var b = args[1]!;
+        if (!a.IsNumeric || !b.IsNumeric)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'pow'.", span);
+            return null;
+        }
+
+        if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Scalar)
+        {
+            return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), a.VectorSize);
+        }
+
+        if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Vector && a.VectorSize == b.VectorSize)
+        {
+            return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), a.VectorSize);
+        }
+
+        return SemType.Scalar(PromoteBase(a.BaseType, b.BaseType));
+    }
+
+    private static SemType? ResolveLength(IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        if (args.Count != 1 || args[0] is null) return null;
+        var a = args[0]!;
+        if (a.Kind == TypeKind.Vector)
+        {
+            return SemType.Scalar(a.BaseType);
+        }
+
+        return null;
+    }
+
+    private static SemType? ResolveTexture(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span)
+    {
+        if (args.Count < 2)
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            return null;
+        }
+
+        var sampler = args[0];
+        if (sampler is null || sampler.Kind != TypeKind.Resource || !IsSampler(sampler.BaseType))
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            return null;
+        }
+
+        return SemType.Vector("float", 4);
+    }
+
+    private static SemType? ResolveSample(IReadOnlyList<SemType?> args)
+    {
+        if (args.Count == 0) return null;
+        return SemType.Vector("float", 4);
+    }
+
+    private static string PromoteBase(string a, string b) => TypeCompatibility.PromoteBinary(SemType.Scalar(a), SemType.Scalar(b))?.BaseType ?? a;
+
+    private static bool IsSampler(string name) =>
+        name.Contains("sampler", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed record SemType
@@ -2060,13 +1978,20 @@ internal static class ExpressionTypeAnalyzer
             .GroupBy(s => s.Name!)
             .ToDictionary(g => g.Key, g => typeInference.ParseType(g.First().Type!));
 
-        Traverse(root);
+        Traverse(root, inFxScope: false);
 
-        void Traverse(NodeInfo node)
+        void Traverse(NodeInfo node, bool inFxScope)
         {
+            var enteringFx = inFxScope || node.Kind is "TechniqueDeclaration" or "Technique10Declaration" or "TechniqueBody" or "PassDeclaration";
+
+            if (enteringFx)
+            {
+                return;
+            }
+
             foreach (var child in node.Children)
             {
-                Traverse(child.Node);
+                Traverse(child.Node, enteringFx);
             }
 
             switch (node.Kind)
@@ -2346,9 +2271,46 @@ internal static class ExpressionTypeAnalyzer
 
 internal static class EntryPointResolver
 {
-    public static List<EntryPointInfo> Resolve(List<SymbolInfo> symbols, string entryName, string profile, TypeInference inference, Dictionary<int, Span> spans)
+    public static List<EntryPointInfo> Resolve(List<SymbolInfo> symbols, IReadOnlyList<FxTechniqueInfo> techniques, string entryName, string profile, TypeInference inference, Dictionary<int, Span> spans)
     {
         var stage = StageFromProfile(profile);
+
+        var techniqueBinding = FindTechniqueBinding(techniques, stage);
+        if (techniqueBinding is not null)
+        {
+            var selectedEntry = techniqueBinding.Entry ?? entryName;
+            var symbol = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(s.Name, selectedEntry, StringComparison.OrdinalIgnoreCase));
+            if (symbol is null && techniqueBinding.EntrySymbolId is not null)
+            {
+                symbol = symbols.FirstOrDefault(s => s.Id == techniqueBinding.EntrySymbolId);
+            }
+
+            if (symbol is null)
+            {
+                var newId = AllocateSymbolId(symbols);
+                symbol = new SymbolInfo
+                {
+                    Id = newId,
+                    Kind = "Function",
+                    Name = selectedEntry,
+                    Type = "void()"
+                };
+                symbols.Add(symbol);
+            }
+
+            return new List<EntryPointInfo>
+            {
+                new EntryPointInfo
+                {
+                    Name = symbol.Name,
+                    SymbolId = symbol.Id,
+                    Stage = stage,
+                    Profile = string.IsNullOrWhiteSpace(techniqueBinding.Profile) ? profile : techniqueBinding.Profile
+                }
+            };
+        }
+
         var entry = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
             && string.Equals(s.Name, entryName, StringComparison.OrdinalIgnoreCase));
 
@@ -2373,6 +2335,29 @@ internal static class EntryPointResolver
                 Profile = profile
             }
         };
+    }
+
+    private static FxShaderBinding? FindTechniqueBinding(IReadOnlyList<FxTechniqueInfo> techniques, string stage)
+    {
+        if (string.IsNullOrWhiteSpace(stage)) return null;
+        foreach (var technique in techniques)
+        {
+            foreach (var pass in technique.Passes)
+            {
+                var shader = pass.Shaders.FirstOrDefault(s => string.Equals(s.Stage, stage, StringComparison.OrdinalIgnoreCase));
+                if (shader is not null)
+                {
+                    return shader;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static int AllocateSymbolId(List<SymbolInfo> symbols)
+    {
+        var maxId = symbols.Where(s => s.Id is not null).Select(s => s.Id!.Value).DefaultIfEmpty(0).Max();
+        return maxId + 1;
     }
 
     private static string StageFromProfile(string profile)

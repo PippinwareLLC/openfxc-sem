@@ -269,6 +269,17 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
         Assert.Contains(types, t => t.GetProperty("type").GetString() == "float4");
     }
 
+    [Fact]
+    public void Intrinsic_overloads_cover_sm3_sample()
+    {
+        var path = RepoPath("samples", "sm3", "intrinsics_overloads", "main.hlsl");
+        var astJson = ParseHelper.BuildAstJsonFromPath(path);
+        var analyzer = new SemanticAnalyzer("vs_3_0", "main", astJson);
+        var output = analyzer.Analyze();
+
+        Assert.DoesNotContain(output.Diagnostics, d => d.Id == "HLSL2001");
+    }
+
     private static string RunParseThenAnalyzeSource(string source, string profile)
     {
         BuildHelper.EnsureBuilt();
@@ -280,5 +291,14 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         });
+    }
+
+    private static string RepoPath(params string[] parts)
+    {
+        var baseDir = AppContext.BaseDirectory;
+        var repoRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", ".."));
+        return parts.Length == 0
+            ? repoRoot
+            : Path.Combine(new[] { repoRoot }.Concat(parts).ToArray());
     }
 }

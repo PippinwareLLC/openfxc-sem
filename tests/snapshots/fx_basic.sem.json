@@ -680,22 +680,6 @@
     {
       "nodeId": 10,
       "type": "float4"
-    },
-    {
-      "nodeId": 23,
-      "type": "float4(float4)"
-    },
-    {
-      "nodeId": 24,
-      "type": "float4"
-    },
-    {
-      "nodeId": 33,
-      "type": "float4(float4)"
-    },
-    {
-      "nodeId": 34,
-      "type": "float4"
     }
   ],
   "entryPoints": [
@@ -739,24 +723,6 @@
     }
   ],
   "diagnostics": [
-    {
-      "severity": "Error",
-      "id": "HLSL2001",
-      "message": "Function \u0027main\u0027 expects 1 arguments but got 0.",
-      "span": {
-        "start": 140,
-        "end": 147
-      }
-    },
-    {
-      "severity": "Error",
-      "id": "HLSL2001",
-      "message": "Function \u0027main\u0027 expects 1 arguments but got 0.",
-      "span": {
-        "start": 186,
-        "end": 193
-      }
-    },
     {
       "severity": "Error",
       "id": "HLSL3002",

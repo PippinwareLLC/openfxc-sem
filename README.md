@@ -71,7 +71,7 @@ High-level shape of `output.sem.json`:
 - Infer types for expressions, declarations, and returns across scalars, vectors, matrices, arrays, and resource types.
 - Resolve intrinsics/builtins (e.g., `mul`, `dot`, `normalize`, `tex2D`) with correct signatures and diagnostics on misuse.
 - Parse and normalize semantics (`POSITION0`, `COLOR0`, `SV_Position`, `SV_Target1`, etc.) for parameters and returns.
-- Resolve entry points (default `main` or `--entry`), tie them to the selected profile, and record stage information.
+- Resolve entry points (default `main` or `--entry`), tie them to the selected profile or FX technique/pass bindings, and record stage information.
 - Never crash on malformed input; always return diagnostics alongside any partial semantic model.
 
 ## Error Coverage
