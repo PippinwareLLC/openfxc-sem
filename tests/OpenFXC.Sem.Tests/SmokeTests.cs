@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Xunit;
 using OpenFXC.Sem;
 
@@ -97,6 +98,7 @@ public class SmokeTests
     public void Analyze_parses_all_dx_sdk_fx_samples(string relativePath)
     {
         Console.WriteLine($"Parsing/analyzing: {relativePath}");
+        var profile = DetectProfile(relativePath);
         var astJson = BuildAstJson(relativePath);
         if (IsIncludeOnlyAst(astJson))
         {
@@ -104,7 +106,7 @@ public class SmokeTests
             return;
         }
 
-        var semJson = AnalyzeAstJson(astJson, profile: "vs_2_0");
+        var semJson = AnalyzeAstJson(astJson, profile);
         using var doc = JsonDocument.Parse(semJson);
         var root = doc.RootElement;
 
@@ -139,6 +141,39 @@ public class SmokeTests
     {
         var astJson = BuildAstJson(hlslRelativePath);
         return AnalyzeAstJson(astJson, profile);
+    }
+
+    private static string DetectProfile(string hlslRelativePath)
+    {
+        try
+        {
+            var path = Path.Combine(RepoPath(), hlslRelativePath);
+            var source = File.ReadAllText(path);
+            var regex = new Regex(@"\b(vs|ps|gs|hs|ds|cs)_(\d)_(\d)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            var matches = regex.Matches(source);
+            if (matches.Count == 0)
+            {
+                return "vs_2_0";
+            }
+
+            (int major, int minor, string stage) best = (0, 0, "vs");
+            foreach (Match match in matches)
+            {
+                var stage = match.Groups[1].Value.ToLowerInvariant();
+                var major = int.Parse(match.Groups[2].Value);
+                var minor = int.Parse(match.Groups[3].Value);
+                if (major > best.major || (major == best.major && minor > best.minor))
+                {
+                    best = (major, minor, stage);
+                }
+            }
+
+            return $"{best.stage}_{best.major}_{best.minor}";
+        }
+        catch
+        {
+            return "vs_2_0";
+        }
     }
 
     private static string BuildAstJson(string hlslRelativePath)
