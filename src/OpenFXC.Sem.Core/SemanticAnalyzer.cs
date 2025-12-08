@@ -728,7 +728,7 @@ internal static class SymbolBuilder
         var name = tokens.GetChildIdentifierText(node, "identifier");
         var type = tokens.GetChildTypeText(node, "type");
         var isUniform = node.Span is not null && tokens.HasModifier(node.Span.Value, "uniform");
-        var arraySuffix = node.Span is null ? null : tokens.ExtractArraySuffix(node.Span.Value);
+        var arraySuffix = tokens.GetArraySuffix(node);
         if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(arraySuffix))
         {
             type = $"{type}{arraySuffix}";
@@ -775,7 +775,7 @@ internal static class SymbolBuilder
         var name = tokens.GetChildIdentifierText(node, "identifier");
         var type = tokens.GetChildTypeText(node, "type");
         var isUniform = node.Span is not null && tokens.HasModifier(node.Span.Value, "uniform");
-        var arraySuffix = node.Span is null ? null : tokens.ExtractArraySuffix(node.Span.Value);
+        var arraySuffix = tokens.GetArraySuffix(node);
         if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(arraySuffix))
         {
             type = $"{type}{arraySuffix}";
@@ -989,6 +989,35 @@ internal sealed class TokenLookup
         return null;
     }
 
+    public string? GetArraySuffix(NodeInfo node)
+    {
+        var arrayChild = node.Children.FirstOrDefault(c => string.Equals(c.Role, "array", StringComparison.OrdinalIgnoreCase)).Node;
+        if (arrayChild?.Span is Span arraySpan)
+        {
+            var text = GetText(arraySpan);
+            if (!string.IsNullOrWhiteSpace(text) && text.Contains("]"))
+            {
+                return text;
+            }
+
+            var startIndex = _tokens.FindIndex(t => t.Start >= arraySpan.Start && t.Text == "[");
+            if (startIndex >= 0)
+            {
+                var endIndex = _tokens.FindIndex(startIndex, t => t.Text == "]");
+                if (endIndex > startIndex)
+                {
+                    var suffix = string.Concat(_tokens.Skip(startIndex).Take(endIndex - startIndex + 1).Select(t => t.Text));
+                    if (!string.IsNullOrWhiteSpace(suffix))
+                    {
+                        return suffix;
+                    }
+                }
+            }
+        }
+
+        return node.Span is null ? null : ExtractArraySuffix(node.Span.Value);
+    }
+
     private string? GetText(Span span)
     {
         var text = string.Concat(_tokens
@@ -1091,13 +1120,23 @@ internal sealed class TokenLookup
 
     public string? ExtractArraySuffix(Span span)
     {
-        var startIndex = _tokens.FindIndex(t => t.Start >= span.Start && t.Start <= span.End + 1 && t.Text == "[");
+        var slice = _tokens
+            .Where(t => t.Start >= span.Start && t.End <= span.End)
+            .OrderBy(t => t.Start)
+            .ToList();
+
+        // Stop scanning once we hit an initializer/annotation/terminator token to avoid grabbing brackets from expressions.
+        var terminators = new HashSet<string>(StringComparer.Ordinal) { "=", ";", ":", ")", "," };
+        var limitIndex = slice.FindIndex(t => terminators.Contains(t.Text));
+        if (limitIndex < 0) limitIndex = slice.Count;
+
+        var startIndex = slice.FindIndex(0, limitIndex, t => t.Text == "[");
         if (startIndex < 0) return null;
 
-        var endIndex = _tokens.FindIndex(startIndex, t => t.Text == "]");
-        if (endIndex < 0 || endIndex < startIndex) return null;
+        var endIndex = slice.FindIndex(startIndex, t => t.Text == "]");
+        if (endIndex < 0 || endIndex >= limitIndex || endIndex < startIndex) return null;
 
-        return string.Concat(_tokens.Skip(startIndex).Take(endIndex - startIndex + 1).Select(t => t.Text));
+        return string.Concat(slice.Skip(startIndex).Take(endIndex - startIndex + 1).Select(t => t.Text));
     }
 
     private List<TokenInfo> GetNextTokens(int position, int count)
@@ -1151,6 +1190,18 @@ internal sealed class TokenLookup
         if (filtered.Count < 2) return;
         var type = filtered[0].Text;
         var name = filtered[1].Text;
+
+        // Preserve array suffix (e.g., float4 foo[4]) by scanning the raw token slice.
+        var bracketStart = tokens.FindIndex(t => t.Text == "[");
+        if (bracketStart >= 0)
+        {
+            var bracketEnd = tokens.FindIndex(bracketStart, t => t.Text == "]");
+            if (bracketEnd >= bracketStart)
+            {
+                var suffix = string.Concat(tokens.Skip(bracketStart).Take(bracketEnd - bracketStart + 1).Select(t => t.Text));
+                type = $"{type}{suffix}";
+            }
+        }
         members.Add((type, name));
     }
 
@@ -1258,6 +1309,11 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
         new IntrinsicSignature { Name = "length", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Scalar("float") },
         new IntrinsicSignature { Name = "length", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Scalar("float") },
@@ -1385,8 +1441,10 @@ internal static class Intrinsics
             "pow" => ResolvePow(args, inference, span, suppressDiagnostics),
             "length" => ResolveLength(args, inference, span, suppressDiagnostics) ?? ResolveFromCatalog(lower, args, inference, span, suppressDiagnostics),
             "maxvertexcount" => ResolveMaxVertexCount(args),
+            "load" => SemType.Vector("float", 4),
             var t when t.StartsWith("tex", StringComparison.OrdinalIgnoreCase) => ResolveTexture(t, args, inference, span, suppressDiagnostics),
             var s when s.StartsWith("sample", StringComparison.OrdinalIgnoreCase) => ResolveSample(args),
+            var m when m.Contains(".", StringComparison.Ordinal) && m.EndsWith(".load", StringComparison.OrdinalIgnoreCase) => SemType.Vector("float", 4),
             _ => null
         };
     }
@@ -1936,6 +1994,27 @@ internal static class TypeCompatibility
     private static int RankOf(string name) => ScalarRank.TryGetValue(name, out var rank) ? rank : -1;
 }
 
+internal sealed class ValueTupleComparer<T1, T2> : IEqualityComparer<(T1, T2)>
+{
+    private readonly IEqualityComparer<T1> _c1;
+    private readonly IEqualityComparer<T2> _c2;
+
+    public ValueTupleComparer(IEqualityComparer<T1> c1, IEqualityComparer<T2> c2)
+    {
+        _c1 = c1 ?? EqualityComparer<T1>.Default;
+        _c2 = c2 ?? EqualityComparer<T2>.Default;
+    }
+
+    public bool Equals((T1, T2) x, (T1, T2) y) => _c1.Equals(x.Item1, y.Item1) && _c2.Equals(x.Item2, y.Item2);
+
+    public int GetHashCode((T1, T2) obj)
+    {
+        var h1 = _c1.GetHashCode(obj.Item1);
+        var h2 = _c2.GetHashCode(obj.Item2);
+        return ((h1 * 397) ^ h2);
+    }
+}
+
 internal sealed class TypeInference
 {
     private readonly Dictionary<int, SemType> _nodeTypes = new();
@@ -2038,17 +2117,27 @@ internal static class ExpressionTypeAnalyzer
             .Where(s => !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Type))
             .GroupBy(s => s.Name!)
             .ToDictionary(g => g.Key, g => typeInference.ParseType(g.First().Type!));
+        var symbolTypesByScope = symbols
+            .Where(s => !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Type))
+            .ToDictionary(
+                s => (s.ParentSymbolId, s.Name!),
+                s => typeInference.ParseType(s.Type!),
+                new ValueTupleComparer<int?, string>(EqualityComparer<int?>.Default, StringComparer.OrdinalIgnoreCase));
         var structMembers = BuildStructMemberMap(symbols, typeInference);
 
-        Traverse(root, inFxScope: false);
+        Traverse(root, inFxScope: false, currentFunctionId: (int?)null);
 
-        void Traverse(NodeInfo node, bool inFxScope)
+        void Traverse(NodeInfo node, bool inFxScope, int? currentFunctionId)
         {
             var enteringFx = inFxScope || node.Kind is "TechniqueDeclaration" or "Technique10Declaration" or "TechniqueBody" or "PassDeclaration";
+            if (string.Equals(node.Kind, "FunctionDeclaration", StringComparison.OrdinalIgnoreCase))
+            {
+                currentFunctionId = node.Id;
+            }
 
             foreach (var child in node.Children)
             {
-                Traverse(child.Node, enteringFx);
+                Traverse(child.Node, enteringFx, currentFunctionId);
             }
 
             switch (node.Kind)
@@ -2056,9 +2145,22 @@ internal static class ExpressionTypeAnalyzer
                 case "Identifier":
                     {
                         var name = tokens.GetText(node.Span);
-                        if (name is not null && symbolTypes.TryGetValue(name, out var t) && t is not null)
+                        if (name is not null)
                         {
-                            AddType(types, typeInference, node.Id, t);
+                            SemType? t = null;
+                            if (symbolTypesByScope.TryGetValue((currentFunctionId, name), out var scoped) && scoped is not null)
+                            {
+                                t = scoped;
+                            }
+                            else if (symbolTypes.TryGetValue(name, out var global) && global is not null)
+                            {
+                                t = global;
+                            }
+
+                            if (t is not null)
+                            {
+                                AddType(types, typeInference, node.Id, t);
+                            }
                         }
                         else if (name is not null && (Intrinsics.IsIntrinsic(name) || IsTypeName(name)))
                         {
@@ -2144,7 +2246,7 @@ internal static class ExpressionTypeAnalyzer
         return map;
     }
 
-    private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, SemType?> symbolTypes, TypeInference typeInference, List<TypeInfo> types, bool suppressDiagnostics)
+        private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, SemType?> symbolTypes, TypeInference typeInference, List<TypeInfo> types, bool suppressDiagnostics)
     {
         var callee = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
         var calleeName = callee is null ? null : tokens.GetText(callee.Span);
@@ -2489,7 +2591,7 @@ internal static class SemanticValidator
         var smMajor = ParseProfileMajor(profile);
 
         var function = symbols.FirstOrDefault(s => s.Id == entry.SymbolId);
-        var hasStructReturn = HasStructReturnWithSemantics(function, symbols);
+        var hasStructReturn = StructHasSemantics(function?.Type, symbols);
         if (function is not null)
         {
             ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference, TryFindSpan(spans, function.DeclNodeId));
@@ -2499,6 +2601,10 @@ internal static class SemanticValidator
         foreach (var param in symbols.Where(s => s.ParentSymbolId == entry.SymbolId && string.Equals(s.Kind, "Parameter", StringComparison.OrdinalIgnoreCase)))
         {
             if (param.IsUniform)
+            {
+                continue;
+            }
+            if (StructHasSemantics(param.Type, symbols))
             {
                 continue;
             }
@@ -2524,14 +2630,13 @@ internal static class SemanticValidator
         }
     }
 
-    private static bool HasStructReturnWithSemantics(SymbolInfo? function, List<SymbolInfo> symbols)
+    private static bool StructHasSemantics(string? typeText, List<SymbolInfo> symbols)
     {
-        if (function is null || string.IsNullOrWhiteSpace(function.Type))
+        if (string.IsNullOrWhiteSpace(typeText))
         {
             return false;
         }
 
-        var typeText = function.Type!;
         var parenIdx = typeText.IndexOf('(');
         var returnText = parenIdx > 0 ? typeText[..parenIdx] : typeText;
         var structSym = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Struct", StringComparison.OrdinalIgnoreCase)
