@@ -2700,7 +2700,7 @@ internal static class SemanticValidator
                 inference.AddDiagnostic("HLSL3002", "Pixel shader parameters should not use SV_POSITION (use input TEXCOORD/position semantics).", span);
             }
 
-            if (smMajor >= 4 && !IsParameterSemanticAllowed(stage, name))
+            if (smMajor >= 4 && name.StartsWith("SV_", StringComparison.OrdinalIgnoreCase) && !IsParameterSemanticAllowed(stage, name))
             {
                 inference.AddDiagnostic("HLSL3002", $"Semantic '{name}' is not valid for {stage} shader parameters in SM{smMajor}.", span);
             }
