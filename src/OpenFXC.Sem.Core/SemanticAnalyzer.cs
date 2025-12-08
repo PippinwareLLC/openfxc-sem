@@ -1310,6 +1310,16 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
+        new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "noise", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "noise", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "noise", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "noise", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Scalar("float") },
+
         new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "sqrt", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
