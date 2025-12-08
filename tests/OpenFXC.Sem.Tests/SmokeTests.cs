@@ -97,7 +97,14 @@ public class SmokeTests
     public void Analyze_parses_all_dx_sdk_fx_samples(string relativePath)
     {
         Console.WriteLine($"Parsing/analyzing: {relativePath}");
-        var semJson = RunParseThenAnalyze(relativePath, profile: "vs_2_0");
+        var astJson = BuildAstJson(relativePath);
+        if (IsIncludeOnlyAst(astJson))
+        {
+            Console.WriteLine($"Skipping include-only FX (no techniques/passes): {relativePath}");
+            return;
+        }
+
+        var semJson = AnalyzeAstJson(astJson, profile: "vs_2_0");
         using var doc = JsonDocument.Parse(semJson);
         var root = doc.RootElement;
 
@@ -130,11 +137,21 @@ public class SmokeTests
 
     private static string RunParseThenAnalyze(string hlslRelativePath, string profile)
     {
+        var astJson = BuildAstJson(hlslRelativePath);
+        return AnalyzeAstJson(astJson, profile);
+    }
+
+    private static string BuildAstJson(string hlslRelativePath)
+    {
         BuildHelper.EnsureBuilt();
 
         var repoRoot = RepoPath();
         var hlslPath = Path.Combine(repoRoot, hlslRelativePath);
-        var astJson = ParseHelper.BuildAstJsonFromPath(hlslPath);
+        return ParseHelper.BuildAstJsonFromPath(hlslPath);
+    }
+
+    private static string AnalyzeAstJson(string astJson, string profile)
+    {
         var analyzer = new SemanticAnalyzer(profile, "main", astJson);
         var output = analyzer.Analyze();
         return JsonSerializer.Serialize(output, new JsonSerializerOptions
@@ -159,5 +176,42 @@ public class SmokeTests
             .Where(d => string.Equals(d.GetProperty("severity").GetString(), "Error", StringComparison.OrdinalIgnoreCase))
             .ToList();
         Assert.True(errors.Count == 0, $"{context} produced error diagnostics: {string.Join(", ", errors.Select(e => e.GetProperty("id").GetString()))}");
+    }
+
+    private static bool IsIncludeOnlyAst(string astJson)
+    {
+        using var doc = JsonDocument.Parse(astJson);
+        if (!doc.RootElement.TryGetProperty("root", out var root))
+        {
+            return false;
+        }
+
+        var stack = new Stack<JsonElement>();
+        stack.Push(root);
+
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            var kind = node.GetProperty("kind").GetString();
+            if (string.Equals(kind, "TechniqueDeclaration", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(kind, "Technique10Declaration", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(kind, "PassDeclaration", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (node.TryGetProperty("children", out var children) && children.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var child in children.EnumerateArray())
+                {
+                    if (child.TryGetProperty("node", out var childNode))
+                    {
+                        stack.Push(childNode);
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 }
