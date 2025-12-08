@@ -1503,6 +1503,17 @@ internal static class Intrinsics
             return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), b.Columns);
         }
 
+        if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Matrix && a.VectorSize < b.Rows)
+        {
+            // Be permissive: treat smaller vector as padded to match the matrix rows, return original vector width.
+            return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), a.VectorSize);
+        }
+
+        if (a.Kind == TypeKind.Matrix && b.Kind == TypeKind.Vector && b.VectorSize < a.Columns)
+        {
+            return SemType.Vector(PromoteBase(a.BaseType, b.BaseType), a.Rows);
+        }
+
         if (a.Kind == TypeKind.Matrix && b.Kind == TypeKind.Matrix && a.Columns == b.Rows)
         {
             return SemType.Matrix(PromoteBase(a.BaseType, b.BaseType), a.Rows, b.Columns);
@@ -1812,6 +1823,11 @@ internal sealed record SemType
         if (IsResourceName(lower))
         {
             return Resource(lower);
+        }
+
+        if (string.Equals(lower, "matrix", StringComparison.OrdinalIgnoreCase))
+        {
+            return Matrix("float", 4, 4);
         }
 
         if (IsNumericBase(lower) || string.Equals(lower, "void", StringComparison.OrdinalIgnoreCase))
