@@ -28,28 +28,35 @@ openfxc-sem analyze [options] < input.ast.json > output.sem.json
   ```
 - AST inputs are produced by the `openfxc-hlsl` submodule (see `openfxc-hlsl/`), keeping parsing and semantics decoupled.
 
-## Semantic analyzer (openfxc-sem) usage
-- Core library: `src/OpenFXC.Sem.Core/OpenFXC.Sem.Core.csproj` produces `OpenFXC.Sem.Core.dll` with the semantic analyzer.
-- CLI wrapper: `src/openfxc-sem/openfxc-sem.csproj` references the library; use it for `analyze` when you want a tool.
-- Example (C#):
+## Library usage (lex/parse + sem)
+- Parser core: `openfxc-hlsl/src/OpenFXC.Hlsl/OpenFXC.Hlsl.csproj` → `OpenFXC.Hlsl.dll` with `Preprocessor`, `HlslLexer`, `Parser`.
+- Semantic core: `src/OpenFXC.Sem.Core/OpenFXC.Sem.Core.csproj` → `OpenFXC.Sem.Core.dll` with `SemanticAnalyzer`.
+- Class library example (C#):
   ```csharp
   using System.Text.Json;
+  using OpenFXC.Hlsl;
   using OpenFXC.Sem;
 
-  // astJson should come from openfxc-hlsl (e.g., call Parser/Preprocessor and serialize ParseResult).
-  var astJson = File.ReadAllText("shader.ast.json");
+  var source = File.ReadAllText("shader.hlsl");
 
-  var analyzer = new SemanticAnalyzer(profile: "vs_3_0", entry: "main", astJson);
-  var output = analyzer.Analyze();
+  // Preprocess, then lex/parse to a ParseResult.
+  var pre = Preprocessor.Preprocess(source, new PreprocessorOptions { FilePath = "shader.hlsl" });
+  var (tokens, lexDiags) = HlslLexer.Lex(pre.Text);
+  var (root, parseDiags) = Parser.Parse(tokens, pre.Text.Length);
+  var parseResult = new ParseResult(
+      formatVersion: 1,
+      sourceInfo: new SourceInfo("shader.hlsl", pre.Text.Length),
+      root: root,
+      tokens: tokens,
+      diagnostics: pre.Diagnostics.Concat(lexDiags).Concat(parseDiags).ToArray());
+  var astJson = JsonSerializer.Serialize(parseResult, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
-  var json = JsonSerializer.Serialize(output, new JsonSerializerOptions
-  {
-      WriteIndented = true,
-  });
-
-  File.WriteAllText("shader.sem.json", json);
+  // Run semantic analysis.
+  var sem = new SemanticAnalyzer(profile: "vs_3_0", entry: "main", inputJson: astJson).Analyze();
+  var semJson = JsonSerializer.Serialize(sem, new JsonSerializerOptions { WriteIndented = true });
+  File.WriteAllText("shader.sem.json", semJson);
   ```
-  Reference the project directly or the built DLL to consume the analyzer from other tools. Use `openfxc-hlsl` to produce the AST JSON; do not hand-write ASTs.
+  Reference the two DLLs directly or project-reference them from your own app. Avoid hand-writing AST JSON; always feed the analyzer with output from the parser.
 
 ## Semantic core (library)
 - Core library: `src/OpenFXC.Sem.Core/OpenFXC.Sem.Core.csproj` produces `OpenFXC.Sem.Core.dll` with the analyzer API.
