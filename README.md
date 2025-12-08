@@ -72,6 +72,7 @@ High-level shape of `output.sem.json`:
 - Resolve intrinsics/builtins (e.g., `mul`, `dot`, `normalize`, `tex2D`) with correct signatures and diagnostics on misuse.
 - Parse and normalize semantics (`POSITION0`, `COLOR0`, `SV_Position`, `SV_Target1`, etc.) for parameters and returns.
 - Resolve entry points (default `main` or `--entry`), tie them to the selected profile or FX technique/pass bindings, and record stage information.
+- Treat `uniform` parameters as effect arguments (no semantics required) and resolve struct member accesses to their declared field types for downstream typing.
 - Never crash on malformed input; always return diagnostics alongside any partial semantic model.
 
 ## Error Coverage
@@ -92,7 +93,7 @@ High-level shape of `output.sem.json`:
 - Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests).
 - Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
 - Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
-- Latest full run: 1314 tests, 0 failed, 0 skipped (16.2s).
+- Latest standard run (no sweep): 61 tests, 0 failed, 0 skipped (~1s). Full DXSDK sweep (`OPENFXC_SEM_FX_SWEEP=all`) is still noisy while FX semantic gaps are being closed.
 - DXSDK sweep macro overrides: `tests/data/defines.json` carries per-file macro hints (e.g., `/D MAX_INSTANCES=256`) that the test harness injects into the `openfxc-hlsl` preprocessor so DXSDK samples that rely on host-provided defines can parse without ad hoc edits.
 
 ## Docs

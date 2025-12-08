@@ -618,7 +618,7 @@
     },
     {
       "nodeId": 23,
-      "type": "vsin"
+      "type": "float4"
     },
     {
       "nodeId": 25,
@@ -626,7 +626,7 @@
     },
     {
       "nodeId": 26,
-      "type": "mul"
+      "type": "float4"
     },
     {
       "nodeId": 28,
@@ -650,24 +650,5 @@
     }
   ],
   "techniques": [],
-  "diagnostics": [
-    {
-      "severity": "Error",
-      "id": "HLSL2001",
-      "message": "No matching intrinsic overload for \u0027mul\u0027.",
-      "span": {
-        "start": 176,
-        "end": 198
-      }
-    },
-    {
-      "severity": "Error",
-      "id": "HLSL2001",
-      "message": "Cannot type-call \u0027mul\u0027 with provided arguments.",
-      "span": {
-        "start": 176,
-        "end": 198
-      }
-    }
-  ]
+  "diagnostics": []
 }

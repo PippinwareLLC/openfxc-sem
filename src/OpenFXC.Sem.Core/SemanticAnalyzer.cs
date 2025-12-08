@@ -727,6 +727,7 @@ internal static class SymbolBuilder
         if (node.Id is null) return null;
         var name = tokens.GetChildIdentifierText(node, "identifier");
         var type = tokens.GetChildTypeText(node, "type");
+        var isUniform = node.Span is not null && tokens.HasModifier(node.Span.Value, "uniform");
         var arraySuffix = node.Span is null ? null : tokens.ExtractArraySuffix(node.Span.Value);
         if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(arraySuffix))
         {
@@ -762,7 +763,8 @@ internal static class SymbolBuilder
             Type = type,
             DeclNodeId = node.Id,
             ParentSymbolId = parentSymbolId,
-            Semantic = semantic
+            Semantic = semantic,
+            IsUniform = isUniform
         };
     }
 
@@ -772,6 +774,7 @@ internal static class SymbolBuilder
 
         var name = tokens.GetChildIdentifierText(node, "identifier");
         var type = tokens.GetChildTypeText(node, "type");
+        var isUniform = node.Span is not null && tokens.HasModifier(node.Span.Value, "uniform");
         var arraySuffix = node.Span is null ? null : tokens.ExtractArraySuffix(node.Span.Value);
         if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(arraySuffix))
         {
@@ -811,7 +814,8 @@ internal static class SymbolBuilder
             Type = type,
             DeclNodeId = node.Id,
             ParentSymbolId = parentSymbolId,
-            Semantic = semantic
+            Semantic = semantic,
+            IsUniform = isUniform
         };
     }
 
@@ -961,11 +965,11 @@ internal sealed class TokenLookup
         {
             if (!string.Equals(child.Role, role, StringComparison.OrdinalIgnoreCase)) continue;
             if (child.Node.Span is null) continue;
-            var text = GetText(child.Node.Span.Value);
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                return text;
-            }
+            var tokens = GetTokens(child.Node.Span.Value)
+                .Where(t => !IsModifier(t.Text))
+                .ToList();
+            var text = string.Concat(tokens.Select(t => t.Text));
+            if (!string.IsNullOrWhiteSpace(text)) return text;
         }
         return null;
     }
@@ -1175,6 +1179,14 @@ internal sealed class TokenLookup
     private static bool IsDelimiter(string text)
     {
         return text is ":" or "," or ")" or "(" or "{" or "}";
+    }
+
+    public bool HasModifier(Span span, string modifier)
+    {
+        var norm = modifier?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(norm)) return false;
+
+        return GetTokens(span).Any(t => string.Equals(t.Text, norm, StringComparison.OrdinalIgnoreCase));
     }
 
     internal static bool TryGetSpan(JsonElement element, out Span span)
@@ -1827,8 +1839,8 @@ internal static class TypeCompatibility
 
         if (l.Kind == TypeKind.Vector && r.Kind == TypeKind.Vector)
         {
-            if (l.VectorSize != r.VectorSize) return null;
-            return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), l.VectorSize);
+            var width = Math.Max(l.VectorSize, r.VectorSize);
+            return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), width);
         }
 
         if (l.Kind == TypeKind.Matrix && r.Kind == TypeKind.Matrix)
@@ -2026,6 +2038,7 @@ internal static class ExpressionTypeAnalyzer
             .Where(s => !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Type))
             .GroupBy(s => s.Name!)
             .ToDictionary(g => g.Key, g => typeInference.ParseType(g.First().Type!));
+        var structMembers = BuildStructMemberMap(symbols, typeInference);
 
         Traverse(root, inFxScope: false);
 
@@ -2065,8 +2078,17 @@ internal static class ExpressionTypeAnalyzer
                         var target = node.Children.FirstOrDefault(c => string.Equals(c.Role, "expression", StringComparison.OrdinalIgnoreCase)).Node;
                         var baseType = typeInference.GetNodeType(target?.Id);
                         var text = tokens.GetText(node.Span);
-                        var swizzle = text?.Split('.').LastOrDefault();
-                        var inferred = InferSwizzleType(baseType, swizzle);
+                        var memberName = text?.Split('.').LastOrDefault();
+                        SemType? inferred = null;
+                        if (baseType is not null && !string.IsNullOrWhiteSpace(memberName))
+                        {
+                            if (structMembers.TryGetValue(baseType.BaseType, out var members)
+                                && members.TryGetValue(memberName!, out var memberType))
+                            {
+                                inferred = memberType;
+                            }
+                        }
+                        inferred ??= InferSwizzleType(baseType, memberName);
                         AddType(types, typeInference, node.Id, inferred);
                     }
                     break;
@@ -2095,6 +2117,31 @@ internal static class ExpressionTypeAnalyzer
                     break;
             }
         }
+    }
+
+    private static Dictionary<string, Dictionary<string, SemType>> BuildStructMemberMap(List<SymbolInfo> symbols, TypeInference typeInference)
+    {
+        var map = new Dictionary<string, Dictionary<string, SemType>>(StringComparer.OrdinalIgnoreCase);
+        var structSymbols = symbols.Where(s => string.Equals(s.Kind, "Struct", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(s.Name)).ToList();
+        foreach (var structSym in structSymbols)
+        {
+            var members = symbols.Where(m => m.ParentSymbolId == structSym.Id && string.Equals(m.Kind, "StructMember", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(m.Name));
+            var memberMap = new Dictionary<string, SemType>(StringComparer.OrdinalIgnoreCase);
+            foreach (var member in members)
+            {
+                var mType = typeInference.ParseType(member.Type);
+                if (mType is not null && !string.IsNullOrWhiteSpace(member.Name))
+                {
+                    memberMap[member.Name!] = mType;
+                }
+            }
+
+            if (memberMap.Count > 0 && structSym.Name is not null)
+            {
+                map[structSym.Name] = memberMap;
+            }
+        }
+        return map;
     }
 
     private static void InferCall(NodeInfo node, TokenLookup tokens, Dictionary<string, SemType?> symbolTypes, TypeInference typeInference, List<TypeInfo> types, bool suppressDiagnostics)
@@ -2442,6 +2489,7 @@ internal static class SemanticValidator
         var smMajor = ParseProfileMajor(profile);
 
         var function = symbols.FirstOrDefault(s => s.Id == entry.SymbolId);
+        var hasStructReturn = HasStructReturnWithSemantics(function, symbols);
         if (function is not null)
         {
             ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference, TryFindSpan(spans, function.DeclNodeId));
@@ -2450,6 +2498,10 @@ internal static class SemanticValidator
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var param in symbols.Where(s => s.ParentSymbolId == entry.SymbolId && string.Equals(s.Kind, "Parameter", StringComparison.OrdinalIgnoreCase)))
         {
+            if (param.IsUniform)
+            {
+                continue;
+            }
             var paramSpan = TryFindSpan(spans, param.DeclNodeId);
             ValidateParameterSemantic(param, stage, smMajor, inference, paramSpan);
             var key = SemanticKey(param.Semantic);
@@ -2466,10 +2518,29 @@ internal static class SemanticValidator
             }
         }
 
-        if (function is not null && function.ReturnSemantic is null)
+        if (function is not null && function.ReturnSemantic is null && !hasStructReturn)
         {
             inference.AddDiagnostic("HLSL3004", "Entry return value missing semantic.", TryFindSpan(spans, function.DeclNodeId));
         }
+    }
+
+    private static bool HasStructReturnWithSemantics(SymbolInfo? function, List<SymbolInfo> symbols)
+    {
+        if (function is null || string.IsNullOrWhiteSpace(function.Type))
+        {
+            return false;
+        }
+
+        var typeText = function.Type!;
+        var parenIdx = typeText.IndexOf('(');
+        var returnText = parenIdx > 0 ? typeText[..parenIdx] : typeText;
+        var structSym = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Struct", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(s.Name, returnText, StringComparison.OrdinalIgnoreCase));
+        if (structSym is null) return false;
+
+        return symbols.Any(m => m.ParentSymbolId == structSym.Id
+            && string.Equals(m.Kind, "StructMember", StringComparison.OrdinalIgnoreCase)
+            && m.Semantic is not null);
     }
 
         private static void ValidateReturnSemantic(SemanticInfo? semantic, string stage, int smMajor, TypeInference inference, Span? span)
@@ -2803,6 +2874,9 @@ public sealed record SymbolInfo
 
     [JsonPropertyName("returnSemantic")]
     public SemanticInfo? ReturnSemantic { get; init; }
+
+    [JsonIgnore]
+    internal bool IsUniform { get; init; }
 }
 
 public sealed record SemanticInfo

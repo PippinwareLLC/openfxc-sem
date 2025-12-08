@@ -32,8 +32,10 @@ float4 main(float4 p : POSITION0) : SV_Position
         var source = @"
 float4 main(float2 a : POSITION0) : SV_Position
 {
-    float3 b = a + float3(1, 2, 3);
-    return float4(b, 1);
+    float3x3 m = (float3x3)0;
+    float3 b = a;
+    float3 c = b + m;
+    return float4(c, 1);
 }";
 
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "vs_2_0"));

@@ -34,9 +34,9 @@ float4 main() : SV_Target
         var source = @"
 float4 main() : SV_Target
 {
-    float2 a = 1;
-    float3 b = 2;
-    return a + b;
+    float3x3 m = (float3x3)0;
+    float3 v = 1;
+    return float4(m + v, 1);
 }";
 
         using var doc = JsonDocument.Parse(RunParseThenAnalyzeSource(source, "ps_2_0"));
