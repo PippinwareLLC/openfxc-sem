@@ -4,3 +4,5 @@ src/openfxc-sem/bin/**
 src/openfxc-sem/obj/**
 src/OpenFXC.Sem.Core/obj/**
 src/OpenFXC.Sem.Core/bin/**
+tools/MacroScan/bin/**
+tools/MacroScan/obj/**

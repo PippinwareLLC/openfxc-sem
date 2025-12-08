@@ -6,5 +6,111 @@
       "MAX_INSTANCES": "256",
       "MAX_GLOWLIGHTS": "32"
     }
+  },
+  {
+    "match": "skinnedmesh.fx",
+    "note": "DXSDK SkinnedMesh samples expect max matrix count from host",
+    "defines": {
+      "MAX_MATRICES": "26"
+    }
+  },
+  {
+    "match": "HDRLighting.fx",
+    "note": "DXSDK HDRLighting samples set light/sample counts via /D",
+    "defines": {
+      "NUM_LIGHTS": "4",
+      "MAX_SAMPLES": "16"
+    }
+  },
+  {
+    "match": "PRT.fx",
+    "note": "PRT samples configure cluster/PCA counts in build scripts",
+    "defines": {
+      "NUM_CLUSTERS": "4",
+      "NUM_PCA": "4"
+    }
+  },
+  {
+    "match": "LocalDeformablePRT.fx",
+    "note": "Local deformable PRT uses host-defined matrix count",
+    "defines": {
+      "MAX_MATRICES": "26"
+    }
+  },
+  {
+    "match": "PRTDemo/prt.fx",
+    "note": "PRTDemo sample sets cluster/PCA counts via macros",
+    "defines": {
+      "NUM_CLUSTERS": "4",
+      "NUM_PCA": "4"
+    }
+  },
+  {
+    "match": "ProceduralMaterials.fx",
+    "note": "ProceduralMaterials sliders sized by host macro",
+    "defines": {
+      "NUM_SLIDERS": "8"
+    }
+  },
+  {
+    "match": "SubDtoBezier.fx",
+    "note": "SubD10 sample sizes arrays with host macros",
+    "defines": {
+      "MAX_POINTS": "64",
+      "PATCH_STRIDE": "16"
+    }
+  },
+  {
+    "match": "AdaptiveTessellationCS40",
+    "note": "Adaptive tessellation CS samples expect macro factors",
+    "defines": {
+      "MAX_FACTOR": "64",
+      "GI": "1"
+    }
+  },
+  {
+    "match": "BC6HBC7EncoderDecoder11",
+    "note": "BC6/BC7 encoder/decoder samples set group size macros",
+    "defines": {
+      "GI": "1"
+    }
+  },
+  {
+    "match": "ComputeShaderSort11",
+    "note": "ComputeShaderSort sample uses macro GI/XY for thread groups",
+    "defines": {
+      "GI": "1",
+      "XY": "1"
+    }
+  },
+  {
+    "match": "HDRToneMappingCS11",
+    "note": "HDRToneMapping CS samples rely on GI macro for group size",
+    "defines": {
+      "GI": "1"
+    }
+  },
+  {
+    "match": "NBodyGravityCS11",
+    "note": "NBodyGravity CS sample uses GI macro for group size",
+    "defines": {
+      "GI": "1"
+    }
+  },
+  {
+    "match": "FluidCS11",
+    "note": "FluidCS sample uses several index macros from host code",
+    "defines": {
+      "GI": "1",
+      "ID": "0",
+      "N_ID": "0",
+      "P_ID": "0",
+      "G_ID": "0",
+      "G_ID_NEXT": "0",
+      "G_ID_PREV": "0",
+      "G_CELL": "0",
+      "UNUSED": "0",
+      "VALUE": "0"
+    }
   }
 ]
