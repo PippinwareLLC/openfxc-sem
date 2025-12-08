@@ -2,10 +2,10 @@
   "formatVersion": 3,
   "profile": "vs_2_0",
   "syntax": {
-    "rootId": 45,
+    "rootId": 43,
     "nodes": [
       {
-        "id": 45,
+        "id": 43,
         "kind": "CompilationUnit",
         "span": {
           "start": 0,
@@ -18,7 +18,7 @@
           },
           {
             "role": "declaration",
-            "nodeId": 44
+            "nodeId": 42
           }
         ]
       },
@@ -200,7 +200,7 @@
         "children": []
       },
       {
-        "id": 44,
+        "id": 42,
         "kind": "TechniqueDeclaration",
         "span": {
           "start": 64,
@@ -213,7 +213,7 @@
           },
           {
             "role": "body",
-            "nodeId": 43
+            "nodeId": 41
           }
         ]
       },
@@ -227,7 +227,7 @@
         "children": []
       },
       {
-        "id": 43,
+        "id": 41,
         "kind": "TechniqueBody",
         "span": {
           "start": 81,
@@ -236,12 +236,12 @@
         "children": [
           {
             "role": "pass",
-            "nodeId": 42
+            "nodeId": 40
           }
         ]
       },
       {
-        "id": 42,
+        "id": 40,
         "kind": "PassDeclaration",
         "span": {
           "start": 88,
@@ -254,7 +254,7 @@
           },
           {
             "role": "body",
-            "nodeId": 41
+            "nodeId": 39
           }
         ]
       },
@@ -268,7 +268,7 @@
         "children": []
       },
       {
-        "id": 41,
+        "id": 39,
         "kind": "Block",
         "span": {
           "start": 99,
@@ -277,54 +277,38 @@
         "children": [
           {
             "role": "statement",
-            "nodeId": 20
+            "nodeId": 24
           },
           {
             "role": "statement",
-            "nodeId": 22
+            "nodeId": 33
           },
           {
             "role": "statement",
-            "nodeId": 25
-          },
-          {
-            "role": "statement",
-            "nodeId": 30
-          },
-          {
-            "role": "statement",
-            "nodeId": 32
-          },
-          {
-            "role": "statement",
-            "nodeId": 35
-          },
-          {
-            "role": "statement",
-            "nodeId": 40
+            "nodeId": 38
           }
         ]
       },
       {
-        "id": 20,
+        "id": 24,
         "kind": "ExpressionStatement",
         "span": {
           "start": 110,
-          "end": 132
+          "end": 147
         },
         "children": [
           {
             "role": "expression",
-            "nodeId": 18
+            "nodeId": 22
           }
         ]
       },
       {
-        "id": 18,
+        "id": 22,
         "kind": "BinaryExpression",
         "span": {
           "start": 110,
-          "end": 132
+          "end": 147
         },
         "operator": "=",
         "children": [
@@ -334,11 +318,11 @@
           },
           {
             "role": "operator",
-            "nodeId": 19
+            "nodeId": 23
           },
           {
             "role": "right",
-            "nodeId": 17
+            "nodeId": 21
           }
         ]
       },
@@ -352,13 +336,35 @@
         "children": []
       },
       {
-        "id": 19,
+        "id": 23,
         "kind": "Operator",
         "span": {
           "start": 123,
           "end": 124
         },
         "children": []
+      },
+      {
+        "id": 21,
+        "kind": "CompileExpression",
+        "span": {
+          "start": 125,
+          "end": 147
+        },
+        "children": [
+          {
+            "role": "keyword",
+            "nodeId": 17
+          },
+          {
+            "role": "profile",
+            "nodeId": 18
+          },
+          {
+            "role": "entry",
+            "nodeId": 20
+          }
+        ]
       },
       {
         "id": 17,
@@ -370,21 +376,7 @@
         "children": []
       },
       {
-        "id": 22,
-        "kind": "ExpressionStatement",
-        "span": {
-          "start": 133,
-          "end": 139
-        },
-        "children": [
-          {
-            "role": "expression",
-            "nodeId": 21
-          }
-        ]
-      },
-      {
-        "id": 21,
+        "id": 18,
         "kind": "Identifier",
         "span": {
           "start": 133,
@@ -393,21 +385,7 @@
         "children": []
       },
       {
-        "id": 25,
-        "kind": "ExpressionStatement",
-        "span": {
-          "start": 140,
-          "end": 147
-        },
-        "children": [
-          {
-            "role": "expression",
-            "nodeId": 24
-          }
-        ]
-      },
-      {
-        "id": 24,
+        "id": 20,
         "kind": "CallExpression",
         "span": {
           "start": 140,
@@ -420,12 +398,12 @@
         "children": [
           {
             "role": "callee",
-            "nodeId": 23
+            "nodeId": 19
           }
         ]
       },
       {
-        "id": 23,
+        "id": 19,
         "kind": "Identifier",
         "span": {
           "start": 140,
@@ -436,75 +414,11 @@
         "children": []
       },
       {
-        "id": 30,
+        "id": 33,
         "kind": "ExpressionStatement",
         "span": {
           "start": 157,
-          "end": 178
-        },
-        "children": [
-          {
-            "role": "expression",
-            "nodeId": 28
-          }
-        ]
-      },
-      {
-        "id": 28,
-        "kind": "BinaryExpression",
-        "span": {
-          "start": 157,
-          "end": 178
-        },
-        "operator": "=",
-        "children": [
-          {
-            "role": "left",
-            "nodeId": 26
-          },
-          {
-            "role": "operator",
-            "nodeId": 29
-          },
-          {
-            "role": "right",
-            "nodeId": 27
-          }
-        ]
-      },
-      {
-        "id": 26,
-        "kind": "Identifier",
-        "span": {
-          "start": 157,
-          "end": 168
-        },
-        "children": []
-      },
-      {
-        "id": 29,
-        "kind": "Operator",
-        "span": {
-          "start": 169,
-          "end": 170
-        },
-        "children": []
-      },
-      {
-        "id": 27,
-        "kind": "Identifier",
-        "span": {
-          "start": 171,
-          "end": 178
-        },
-        "children": []
-      },
-      {
-        "id": 32,
-        "kind": "ExpressionStatement",
-        "span": {
-          "start": 179,
-          "end": 185
+          "end": 193
         },
         "children": [
           {
@@ -515,6 +429,78 @@
       },
       {
         "id": 31,
+        "kind": "BinaryExpression",
+        "span": {
+          "start": 157,
+          "end": 193
+        },
+        "operator": "=",
+        "children": [
+          {
+            "role": "left",
+            "nodeId": 25
+          },
+          {
+            "role": "operator",
+            "nodeId": 32
+          },
+          {
+            "role": "right",
+            "nodeId": 30
+          }
+        ]
+      },
+      {
+        "id": 25,
+        "kind": "Identifier",
+        "span": {
+          "start": 157,
+          "end": 168
+        },
+        "children": []
+      },
+      {
+        "id": 32,
+        "kind": "Operator",
+        "span": {
+          "start": 169,
+          "end": 170
+        },
+        "children": []
+      },
+      {
+        "id": 30,
+        "kind": "CompileExpression",
+        "span": {
+          "start": 171,
+          "end": 193
+        },
+        "children": [
+          {
+            "role": "keyword",
+            "nodeId": 26
+          },
+          {
+            "role": "profile",
+            "nodeId": 27
+          },
+          {
+            "role": "entry",
+            "nodeId": 29
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "kind": "Identifier",
+        "span": {
+          "start": 171,
+          "end": 178
+        },
+        "children": []
+      },
+      {
+        "id": 27,
         "kind": "Identifier",
         "span": {
           "start": 179,
@@ -523,21 +509,7 @@
         "children": []
       },
       {
-        "id": 35,
-        "kind": "ExpressionStatement",
-        "span": {
-          "start": 186,
-          "end": 193
-        },
-        "children": [
-          {
-            "role": "expression",
-            "nodeId": 34
-          }
-        ]
-      },
-      {
-        "id": 34,
+        "id": 29,
         "kind": "CallExpression",
         "span": {
           "start": 186,
@@ -550,12 +522,12 @@
         "children": [
           {
             "role": "callee",
-            "nodeId": 33
+            "nodeId": 28
           }
         ]
       },
       {
-        "id": 33,
+        "id": 28,
         "kind": "Identifier",
         "span": {
           "start": 186,
@@ -566,7 +538,7 @@
         "children": []
       },
       {
-        "id": 40,
+        "id": 38,
         "kind": "ExpressionStatement",
         "span": {
           "start": 203,
@@ -575,12 +547,12 @@
         "children": [
           {
             "role": "expression",
-            "nodeId": 38
+            "nodeId": 36
           }
         ]
       },
       {
-        "id": 38,
+        "id": 36,
         "kind": "BinaryExpression",
         "span": {
           "start": 203,
@@ -590,20 +562,20 @@
         "children": [
           {
             "role": "left",
-            "nodeId": 36
+            "nodeId": 34
           },
           {
             "role": "operator",
-            "nodeId": 39
+            "nodeId": 37
           },
           {
             "role": "right",
-            "nodeId": 37
+            "nodeId": 35
           }
         ]
       },
       {
-        "id": 36,
+        "id": 34,
         "kind": "Identifier",
         "span": {
           "start": 203,
@@ -612,7 +584,7 @@
         "children": []
       },
       {
-        "id": 39,
+        "id": 37,
         "kind": "Operator",
         "span": {
           "start": 211,
@@ -621,7 +593,7 @@
         "children": []
       },
       {
-        "id": 37,
+        "id": 35,
         "kind": "Identifier",
         "span": {
           "start": 213,
@@ -682,19 +654,19 @@
       "type": "float4"
     },
     {
-      "nodeId": 23,
+      "nodeId": 19,
       "type": "float4(float4)"
     },
     {
-      "nodeId": 24,
+      "nodeId": 20,
       "type": "float4"
     },
     {
-      "nodeId": 33,
+      "nodeId": 28,
       "type": "float4(float4)"
     },
     {
-      "nodeId": 34,
+      "nodeId": 29,
       "type": "float4"
     }
   ],
@@ -709,11 +681,11 @@
   "techniques": [
     {
       "name": "Simple",
-      "declNodeId": 44,
+      "declNodeId": 42,
       "passes": [
         {
           "name": "First",
-          "declNodeId": 42,
+          "declNodeId": 40,
           "shaders": [
             {
               "stage": "Vertex",
