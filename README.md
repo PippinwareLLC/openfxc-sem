@@ -93,6 +93,7 @@ High-level shape of `output.sem.json`:
 - Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
 - Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
 - Latest full run: 1314 tests, 0 failed, 0 skipped (16.2s).
+- DXSDK sweep macro overrides: `tests/data/defines.json` carries per-file macro hints (e.g., `/D MAX_INSTANCES=256`) that the test harness injects into the `openfxc-hlsl` preprocessor so DXSDK samples that rely on host-provided defines can parse without ad hoc edits.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`

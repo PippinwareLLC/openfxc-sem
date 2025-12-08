@@ -1,0 +1,10 @@
+[
+  {
+    "match": "DeferredParticles.fx",
+    "note": "DXSDK DeferredParticles sample expects host /D macros",
+    "defines": {
+      "MAX_INSTANCES": "256",
+      "MAX_GLOWLIGHTS": "32"
+    }
+  }
+]

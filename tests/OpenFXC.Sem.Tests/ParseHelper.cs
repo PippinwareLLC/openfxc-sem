@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -9,23 +10,43 @@ namespace OpenFXC.Sem.Tests;
 internal static class ParseHelper
 {
     private const int FormatVersion = 1;
+    private static readonly Lazy<IReadOnlyList<DefineEntry>> DefineManifest = new(LoadDefineManifest);
 
     public static string BuildAstJsonFromPath(string path)
     {
         var source = File.ReadAllText(path);
-        var fileName = Path.GetFileName(path);
-        return BuildAstJson(source, fileName);
+        return BuildAstJson(source, Path.GetFileName(path), path);
     }
 
-    public static string BuildAstJson(string source, string fileName = "stdin")
+    public static string BuildAstJson(string source, string fileName = "stdin", string? filePath = null)
     {
-        var (tokens, lexDiagnostics) = HlslLexer.Lex(source);
-        var (root, parseDiagnostics) = Parser.Parse(tokens, source.Length);
-        var allDiagnostics = lexDiagnostics.Concat(parseDiagnostics).ToArray();
+        var defines = ResolveDefines(filePath ?? fileName);
+        var includeDirs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(filePath))
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                includeDirs.Add(dir);
+            }
+        }
+
+        var preOptions = new PreprocessorOptions
+        {
+            FilePath = filePath ?? fileName,
+            IncludeDirectories = includeDirs,
+            Defines = defines
+        };
+
+        var pre = Preprocessor.Preprocess(source, preOptions);
+
+        var (tokens, lexDiagnostics) = HlslLexer.Lex(pre.Text);
+        var (root, parseDiagnostics) = Parser.Parse(tokens, pre.Text.Length);
+        var allDiagnostics = pre.Diagnostics.Concat(lexDiagnostics).Concat(parseDiagnostics).ToArray();
 
         var parseResult = new ParseResult(
             FormatVersion,
-            new SourceInfo(fileName, source.Length),
+            new SourceInfo(fileName, pre.Text.Length),
             root,
             tokens,
             allDiagnostics);
@@ -36,4 +57,56 @@ internal static class ParseHelper
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
     }
+
+    private static IReadOnlyDictionary<string, string?> ResolveDefines(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return new Dictionary<string, string?>(StringComparer.Ordinal);
+        }
+
+        var normalized = Path.GetFullPath(path);
+        var map = new Dictionary<string, string?>(StringComparer.Ordinal);
+
+        foreach (var entry in DefineManifest.Value)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Match))
+            {
+                continue;
+            }
+
+            if (normalized.Contains(entry.Match, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var kvp in entry.Defines)
+                {
+                    map[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+
+        return map;
+    }
+
+    private static IReadOnlyList<DefineEntry> LoadDefineManifest()
+    {
+        try
+        {
+            var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+            var manifestPath = Path.Combine(repoRoot, "tests", "data", "defines.json");
+            if (!File.Exists(manifestPath))
+            {
+                return Array.Empty<DefineEntry>();
+            }
+
+            var json = File.ReadAllText(manifestPath);
+            var entries = JsonSerializer.Deserialize<List<DefineEntry>>(json);
+            return entries ?? new List<DefineEntry>();
+        }
+        catch
+        {
+            return Array.Empty<DefineEntry>();
+        }
+    }
+
+    private sealed record DefineEntry(string Match, Dictionary<string, string?> Defines);
 }
