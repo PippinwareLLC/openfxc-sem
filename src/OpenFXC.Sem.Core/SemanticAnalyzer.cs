@@ -728,6 +728,7 @@ internal static class SymbolBuilder
         var name = tokens.GetChildIdentifierText(node, "identifier");
         var type = tokens.GetChildTypeText(node, "type");
         var isUniform = node.Span is not null && tokens.HasModifier(node.Span.Value, "uniform");
+        var isOut = node.Span is not null && (tokens.HasModifier(node.Span.Value, "out") || tokens.HasModifier(node.Span.Value, "inout"));
         var arraySuffix = tokens.GetArraySuffix(node);
         if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(arraySuffix))
         {
@@ -764,7 +765,8 @@ internal static class SymbolBuilder
             DeclNodeId = node.Id,
             ParentSymbolId = parentSymbolId,
             Semantic = semantic,
-            IsUniform = isUniform
+            IsUniform = isUniform,
+            IsOut = isOut
         };
     }
 
@@ -2618,6 +2620,7 @@ internal static class SemanticValidator
 
         var function = symbols.FirstOrDefault(s => s.Id == entry.SymbolId);
         var hasStructReturn = StructHasSemantics(function?.Type, symbols);
+        var returnsVoid = function?.Type is string ft && ft.Trim().StartsWith("void", StringComparison.OrdinalIgnoreCase);
         if (function is not null)
         {
             ValidateReturnSemantic(function.ReturnSemantic, stage, smMajor, inference, TryFindSpan(spans, function.DeclNodeId));
@@ -2628,6 +2631,15 @@ internal static class SemanticValidator
         {
             if (param.IsUniform)
             {
+                continue;
+            }
+            if (param.IsOut)
+            {
+                // Allow duplicate semantics between inputs/outputs; still require a semantic.
+                if (param.Semantic is null)
+                {
+                    inference.AddDiagnostic("HLSL3004", "Entry parameter missing semantic.", TryFindSpan(spans, param.DeclNodeId));
+                }
                 continue;
             }
             if (StructHasSemantics(param.Type, symbols))
@@ -2650,7 +2662,7 @@ internal static class SemanticValidator
             }
         }
 
-        if (function is not null && function.ReturnSemantic is null && !hasStructReturn)
+        if (function is not null && function.ReturnSemantic is null && !hasStructReturn && !returnsVoid)
         {
             inference.AddDiagnostic("HLSL3004", "Entry return value missing semantic.", TryFindSpan(spans, function.DeclNodeId));
         }
@@ -3008,6 +3020,9 @@ public sealed record SymbolInfo
 
     [JsonIgnore]
     internal bool IsUniform { get; init; }
+
+    [JsonIgnore]
+    internal bool IsOut { get; init; }
 }
 
 public sealed record SemanticInfo
