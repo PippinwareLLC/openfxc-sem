@@ -421,23 +421,28 @@ internal static class FxModelBuilder
 
         private static void ValidatePass(FxPassInfo pass, TypeInference inference)
         {
-            var hasVs = pass.Shaders.Any(s => string.Equals(s.Stage, "Vertex", StringComparison.OrdinalIgnoreCase));
-            var hasPs = pass.Shaders.Any(s => string.Equals(s.Stage, "Pixel", StringComparison.OrdinalIgnoreCase));
-            var hasGs = pass.Shaders.Any(s => string.Equals(s.Stage, "Geometry", StringComparison.OrdinalIgnoreCase));
-            var hasHs = pass.Shaders.Any(s => string.Equals(s.Stage, "Hull", StringComparison.OrdinalIgnoreCase));
-            var hasDs = pass.Shaders.Any(s => string.Equals(s.Stage, "Domain", StringComparison.OrdinalIgnoreCase));
-            var hasCs = pass.Shaders.Any(s => string.Equals(s.Stage, "Compute", StringComparison.OrdinalIgnoreCase));
+        var hasVs = pass.Shaders.Any(s => string.Equals(s.Stage, "Vertex", StringComparison.OrdinalIgnoreCase));
+        var hasPs = pass.Shaders.Any(s => string.Equals(s.Stage, "Pixel", StringComparison.OrdinalIgnoreCase));
+        var hasGs = pass.Shaders.Any(s => string.Equals(s.Stage, "Geometry", StringComparison.OrdinalIgnoreCase));
+        var hasHs = pass.Shaders.Any(s => string.Equals(s.Stage, "Hull", StringComparison.OrdinalIgnoreCase));
+        var hasDs = pass.Shaders.Any(s => string.Equals(s.Stage, "Domain", StringComparison.OrdinalIgnoreCase));
+        var hasCs = pass.Shaders.Any(s => string.Equals(s.Stage, "Compute", StringComparison.OrdinalIgnoreCase));
 
-            if (!pass.Shaders.Any())
-            {
-                inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
-            }
+        if (!pass.Shaders.Any())
+        {
+            inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
+        }
 
-            // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
-            if ((hasGs || hasHs || hasDs || hasCs) && !hasPs)
-            {
-                inference.AddDiagnostic("HLSL5007", $"Pass '{pass.Name}' includes advanced stages but is missing a Pixel shader binding.", pass.Span);
-            }
+        if (hasVs && !hasPs)
+        {
+            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span);
+        }
+
+        // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
+        if ((hasGs || hasHs || hasDs || hasCs) && !hasPs)
+        {
+            inference.AddDiagnostic("HLSL5007", $"Pass '{pass.Name}' includes advanced stages but is missing a Pixel shader binding.", pass.Span);
+        }
 
             foreach (var shader in pass.Shaders)
             {
@@ -1302,6 +1307,7 @@ internal enum TypeKind
     Matrix,
     Array,
     Resource,
+    Stream,
     Function
 }
 
@@ -1351,6 +1357,7 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "length", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Scalar("float") },
 
         new IntrinsicSignature { Name = "cross", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Vector("float", 3) },
+        new IntrinsicSignature { Name = "cross", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 3) },
 
         new IntrinsicSignature { Name = "min", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "min", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
@@ -1381,6 +1388,10 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
+        new IntrinsicSignature { Name = "dot", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "dot", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "dot", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Scalar("float") },
+
         new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
@@ -1392,8 +1403,7 @@ internal static class Intrinsics
 
         new IntrinsicSignature { Name = "tex2Dlod", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
-        new IntrinsicSignature { Name = "maxvertexcount", Parameters = new [] { SemType.Scalar("int") }, ReturnResolver = _ => SemType.Scalar("int") },
-        new IntrinsicSignature { Name = "append", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = _ => SemType.Scalar("void") }
+        new IntrinsicSignature { Name = "maxvertexcount", Parameters = new [] { SemType.Scalar("int") }, ReturnResolver = _ => SemType.Scalar("int") }
     };
 
     public static SemType? Resolve(string name, IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics = false)
@@ -1466,6 +1476,8 @@ internal static class Intrinsics
         || name.Equals("saturate", StringComparison.OrdinalIgnoreCase)
         || name.Equals("pow", StringComparison.OrdinalIgnoreCase)
         || name.Equals("length", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("append", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("restartstrip", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("tex", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("sample", StringComparison.OrdinalIgnoreCase);
 
@@ -1483,6 +1495,8 @@ internal static class Intrinsics
             "transpose" => ResolveTranspose(args, inference, span, suppressDiagnostics),
             "determinant" => ResolveDeterminant(args, inference, span, suppressDiagnostics),
             "maxvertexcount" => ResolveMaxVertexCount(args),
+            "append" => SemType.Scalar("void"),
+            "restartstrip" => SemType.Scalar("void"),
             "load" => SemType.Vector("float", 4),
             var t when t.StartsWith("tex", StringComparison.OrdinalIgnoreCase) => ResolveTexture(t, args, inference, span, suppressDiagnostics),
             var s when s.StartsWith("sample", StringComparison.OrdinalIgnoreCase) => ResolveSample(args),
@@ -1579,7 +1593,8 @@ internal static class Intrinsics
         if (args.Count != 2 || args[0] is null || args[1] is null) return null;
         var a = args[0]!;
         var b = args[1]!;
-        if (a.Kind == TypeKind.Vector && b.Kind == TypeKind.Vector && a.VectorSize == b.VectorSize)
+
+        if (a.IsNumeric && b.IsNumeric)
         {
             return SemType.Scalar(PromoteBase(a.BaseType, b.BaseType));
         }
@@ -1804,6 +1819,16 @@ internal sealed record SemType
         ParameterTypes = System.Array.Empty<SemType>()
     };
 
+    public static SemType Stream(string name, SemType elementType) => new SemType
+    {
+        Kind = TypeKind.Stream,
+        BaseType = NormalizeBase(name),
+        Rows = 1,
+        Columns = 1,
+        ElementType = elementType,
+        ParameterTypes = System.Array.Empty<SemType>()
+    };
+
     public static SemType Function(SemType returnType, IReadOnlyList<SemType> parameters) => new SemType
     {
         Kind = TypeKind.Function,
@@ -1823,6 +1848,7 @@ internal sealed record SemType
             TypeKind.Matrix => $"{BaseType}{Rows}x{Columns}",
             TypeKind.Array => $"{ElementType?.ToNormalizedString()}[{(ArrayLength.HasValue ? ArrayLength.Value.ToString() : string.Empty)}]",
             TypeKind.Resource => BaseType,
+            TypeKind.Stream => $"{BaseType}<{ElementType?.ToNormalizedString()}>",
             TypeKind.Function => $"{ReturnType?.ToNormalizedString()}({string.Join(", ", ParameterTypes.Select(p => p.ToNormalizedString()))})",
             _ => BaseType
         };
@@ -1836,6 +1862,47 @@ internal sealed record SemType
 
         var text = raw.Trim();
         var lower = text.ToLowerInvariant();
+
+        // Strip geometry input modifiers (triangle, line, point, triangleadj, lineadj) that precede the real type.
+        var geomPrefixes = new[] { "triangleadj", "lineadj", "triangle", "line", "point" };
+        foreach (var prefix in geomPrefixes)
+        {
+            if (lower.StartsWith(prefix + " ", StringComparison.Ordinal))
+            {
+                text = text[prefix.Length..].TrimStart();
+                lower = text.ToLowerInvariant();
+                break;
+            }
+
+            if (lower.StartsWith(prefix, StringComparison.Ordinal) && text.Length > prefix.Length && !char.IsLetterOrDigit(text[prefix.Length]))
+            {
+                text = text[prefix.Length..].TrimStart();
+                lower = text.ToLowerInvariant();
+                break;
+            }
+            else if (lower.StartsWith(prefix, StringComparison.Ordinal) && !geomPrefixes.Any(p => p.Length > prefix.Length && lower.StartsWith(p, StringComparison.Ordinal)))
+            {
+                // Handle collapsed tokens like "trianglevsoutput".
+                text = text[prefix.Length..].TrimStart();
+                lower = text.ToLowerInvariant();
+                break;
+            }
+        }
+
+        // Geometry shader stream objects: TriangleStream<T>, LineStream<T>, PointStream<T>, QuadStream<T>, SpriteStream<T>
+        var genericOpen = text.IndexOf('<');
+        if (genericOpen > 0 && text.EndsWith(">", StringComparison.Ordinal))
+        {
+            var basePart = text[..genericOpen];
+            var argPart = text[(genericOpen + 1)..^1];
+            var elementType = Parse(argPart);
+            var baseNorm = basePart.Trim();
+            var baseLower = baseNorm.ToLowerInvariant();
+            if (elementType is not null && (baseLower.Contains("stream", StringComparison.Ordinal) || baseLower.Contains("outputstream", StringComparison.Ordinal)))
+            {
+                return Stream(baseNorm, elementType);
+            }
+        }
 
         var openIdx = text.IndexOf('(');
         var closeIdx = text.LastIndexOf(')');
@@ -1991,6 +2058,13 @@ internal static class TypeCompatibility
             return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), width);
         }
 
+        if (l.Kind == TypeKind.Stream && r.Kind == TypeKind.Stream
+            && string.Equals(l.BaseType, r.BaseType, StringComparison.OrdinalIgnoreCase))
+        {
+            var element = PromoteBinary(l.ElementType, r.ElementType);
+            return element is null ? null : SemType.Stream(l.BaseType, element);
+        }
+
         if (l.Kind == TypeKind.Matrix && r.Kind == TypeKind.Matrix)
         {
             if (l.Rows != r.Rows || l.Columns != r.Columns) return null;
@@ -2040,6 +2114,8 @@ internal static class TypeCompatibility
                 TypeKind.Vector => from.VectorSize == to.VectorSize && CanPromoteBase(from.BaseType, to.BaseType),
                 TypeKind.Matrix => from.Rows == to.Rows && from.Columns == to.Columns && CanPromoteBase(from.BaseType, to.BaseType),
                 TypeKind.Resource => string.Equals(from.BaseType, to.BaseType, StringComparison.OrdinalIgnoreCase),
+                TypeKind.Stream => string.Equals(from.BaseType, to.BaseType, StringComparison.OrdinalIgnoreCase)
+                    && ((from.ElementType is null && to.ElementType is null) || (from.ElementType is not null && to.ElementType is not null && CanPromote(from.ElementType, to.ElementType))),
                 TypeKind.Array when from.ElementType is not null && to.ElementType is not null =>
                     (!to.ArrayLength.HasValue || from.ArrayLength == to.ArrayLength)
                     && CanPromote(from.ElementType, to.ElementType),
@@ -2432,6 +2508,12 @@ internal static class ExpressionTypeAnalyzer
                 }
             }
 
+            var capacity = targetType.Kind == TypeKind.Vector ? targetType.VectorSize : targetType.Rows * targetType.Columns;
+            var supplied = args.Sum(CountComponents);
+            if (supplied > capacity && !suppressDiagnostics)
+            {
+                typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+            }
             return;
         }
 
