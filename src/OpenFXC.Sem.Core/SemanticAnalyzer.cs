@@ -1403,6 +1403,7 @@ internal static class Intrinsics
 
         new IntrinsicSignature { Name = "tex2Dlod", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
+        new IntrinsicSignature { Name = "d3dcolortoubyte4", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "maxvertexcount", Parameters = new [] { SemType.Scalar("int") }, ReturnResolver = _ => SemType.Scalar("int") }
     };
 
