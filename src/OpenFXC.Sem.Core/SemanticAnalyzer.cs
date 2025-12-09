@@ -2387,6 +2387,13 @@ internal static class ExpressionTypeAnalyzer
                 case "BinaryExpression":
                     InferBinary(node, typeInference, types);
                     break;
+                case "UnaryExpression":
+                    {
+                        var operand = node.Children.FirstOrDefault(c => string.Equals(c.Role, "expression", StringComparison.OrdinalIgnoreCase)).Node;
+                        var operandType = typeInference.GetNodeType(operand?.Id);
+                        AddType(types, typeInference, node.Id, operandType);
+                    }
+                    break;
                 case "CastExpression":
                     {
                         var typeNode = node.Children.FirstOrDefault(c => string.Equals(c.Role, "type", StringComparison.OrdinalIgnoreCase)).Node;
