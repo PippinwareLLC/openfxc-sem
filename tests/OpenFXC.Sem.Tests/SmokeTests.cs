@@ -210,7 +210,11 @@ public class SmokeTests
         var errors = diagnostics.EnumerateArray()
             .Where(d => string.Equals(d.GetProperty("severity").GetString(), "Error", StringComparison.OrdinalIgnoreCase))
             .ToList();
-        Assert.True(errors.Count == 0, $"{context} produced error diagnostics: {string.Join(", ", errors.Select(e => e.GetProperty("id").GetString()))}");
+        if (errors.Count > 0)
+        {
+            var details = errors.Select(e => FormatDiagnostic(e, context)).ToList();
+            Assert.Fail($"{context} produced error diagnostics:{Environment.NewLine}{string.Join(Environment.NewLine, details)}");
+        }
     }
 
     private static bool IsIncludeOnlyAst(string astJson)
@@ -248,5 +252,60 @@ public class SmokeTests
         }
 
         return true;
+    }
+
+    private static string FormatDiagnostic(JsonElement diag, string context)
+    {
+        var id = diag.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "unknown" : "unknown";
+        var message = diag.TryGetProperty("message", out var msgEl) ? msgEl.GetString() ?? string.Empty : string.Empty;
+        var span = diag.TryGetProperty("span", out var spanEl)
+            && spanEl.TryGetProperty("start", out var startEl)
+            && spanEl.TryGetProperty("end", out var endEl)
+            && startEl.TryGetInt32(out var start)
+            && endEl.TryGetInt32(out var end)
+            ? (Start: start, End: end)
+            : (Start: 0, End: 0);
+
+        var (line, column, lineText) = ResolveLineInfo(context, span.Start);
+        var caret = column > 1 && lineText.Length >= column - 1
+            ? new string(' ', Math.Max(0, column - 1)) + "^"
+            : "^";
+
+        return $"{id} @ {line}:{column} {message}\n    {lineText}\n    {caret}";
+    }
+
+    private static (int Line, int Column, string LineText) ResolveLineInfo(string relativePath, int offset)
+    {
+        try
+        {
+            var repoRoot = RepoPath();
+            var path = Path.Combine(repoRoot, relativePath);
+            if (!File.Exists(path))
+            {
+                return (1, offset + 1, string.Empty);
+            }
+
+            var text = File.ReadAllText(path);
+            var line = 1;
+            var lineStart = 0;
+            for (var i = 0; i < text.Length && i < offset; i++)
+            {
+                if (text[i] == '\n')
+                {
+                    line++;
+                    lineStart = i + 1;
+                }
+            }
+
+            var column = Math.Max(1, offset - lineStart + 1);
+            var lineEnd = text.IndexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.Length;
+            var lineText = text[lineStart..Math.Min(lineEnd, text.Length)].Replace("\r", string.Empty);
+            return (line, column, lineText);
+        }
+        catch
+        {
+            return (1, offset + 1, string.Empty);
+        }
     }
 }
