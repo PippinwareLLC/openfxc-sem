@@ -1436,6 +1436,12 @@ internal static class Intrinsics
             return dynamic;
         }
 
+        // If any arguments are still unknown, defer resolution without emitting diagnostics.
+        if (args.Any(a => a is null))
+        {
+            return null;
+        }
+
         var matches = Catalog.Where(c => string.Equals(c.Name, normalizedName, StringComparison.OrdinalIgnoreCase)).ToList();
         if (matches.Count == 0)
         {
