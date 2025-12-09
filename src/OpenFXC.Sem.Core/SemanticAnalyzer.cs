@@ -34,6 +34,7 @@ public sealed class SemanticAnalyzer
         {
             using var doc = JsonDocument.Parse(_inputJson);
             var root = doc.RootElement;
+            IngestInputDiagnostics(root);
             rootId = TryGetRootId(root);
             tokens = TokenLookup.From(root);
             _typeInference.SetDocumentLength(tokens.DocumentLength);
@@ -88,6 +89,35 @@ public sealed class SemanticAnalyzer
         }
 
         return null;
+    }
+
+    private void IngestInputDiagnostics(JsonElement root)
+    {
+        if (!root.TryGetProperty("diagnostics", out var diags) || diags.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var diag in diags.EnumerateArray())
+        {
+            var id = diag.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? string.Empty : string.Empty;
+            var message = diag.TryGetProperty("message", out var msgEl) ? msgEl.GetString() ?? string.Empty : string.Empty;
+
+            Span? span = null;
+            if (diag.TryGetProperty("span", out var spanEl)
+                && spanEl.TryGetProperty("start", out var startEl)
+                && spanEl.TryGetProperty("end", out var endEl)
+                && startEl.TryGetInt32(out var start)
+                && endEl.TryGetInt32(out var end))
+            {
+                span = new Span(start, end);
+            }
+
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                _typeInference.AddDiagnostic(id, message, span);
+            }
+        }
     }
 
     private static IReadOnlyList<SyntaxNodeInfo> BuildSyntaxNodes(NodeInfo root, TokenLookup tokens, IReadOnlyList<SymbolInfo> symbols)
@@ -403,11 +433,6 @@ internal static class FxModelBuilder
                 inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
             }
 
-            if (hasVs && !hasPs)
-            {
-                inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span);
-            }
-
             // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
             if ((hasGs || hasHs || hasDs || hasCs) && !hasPs)
             {
@@ -681,12 +706,6 @@ internal static class SymbolBuilder
         var name = tokens.GetChildIdentifierText(node, "identifier");
         var returnType = tokens.GetChildTypeText(node, "type") ?? "void";
         var returnSemantic = ParseSemanticString(tokens.GetAnnotationText(node));
-
-        if (!string.IsNullOrWhiteSpace(name) && symbols.Any(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase) && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
-        {
-            typeInference.AddDiagnostic("HLSL1003", $"Duplicate function '{name}'.", node.Span);
-            return;
-        }
 
         var parameterTypes = new List<string>();
         foreach (var child in node.Children.Where(c => string.Equals(c.Role, "parameter", StringComparison.OrdinalIgnoreCase)))
@@ -1362,6 +1381,15 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "ddy", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
+        new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "smoothstep", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "determinant", Parameters = new [] { SemType.Matrix("float", 2, 2) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "determinant", Parameters = new [] { SemType.Matrix("float", 3, 3) }, ReturnResolver = _ => SemType.Scalar("float") },
+        new IntrinsicSignature { Name = "determinant", Parameters = new [] { SemType.Matrix("float", 4, 4) }, ReturnResolver = _ => SemType.Scalar("float") },
+
         new IntrinsicSignature { Name = "tex2Dlod", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "maxvertexcount", Parameters = new [] { SemType.Scalar("int") }, ReturnResolver = _ => SemType.Scalar("int") },
@@ -1452,6 +1480,8 @@ internal static class Intrinsics
             "saturate" => ResolveSaturate(args, inference, span, suppressDiagnostics),
             "pow" => ResolvePow(args, inference, span, suppressDiagnostics),
             "length" => ResolveLength(args, inference, span, suppressDiagnostics) ?? ResolveFromCatalog(lower, args, inference, span, suppressDiagnostics),
+            "transpose" => ResolveTranspose(args, inference, span, suppressDiagnostics),
+            "determinant" => ResolveDeterminant(args, inference, span, suppressDiagnostics),
             "maxvertexcount" => ResolveMaxVertexCount(args),
             "load" => SemType.Vector("float", 4),
             var t when t.StartsWith("tex", StringComparison.OrdinalIgnoreCase) => ResolveTexture(t, args, inference, span, suppressDiagnostics),
@@ -1573,6 +1603,38 @@ internal static class Intrinsics
         if (!suppressDiagnostics)
         {
             inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for 'normalize'.", span);
+        }
+        return null;
+    }
+
+    private static SemType? ResolveTranspose(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
+    {
+        if (args.Count != 1 || args[0] is null) return null;
+        var a = args[0]!;
+        if (a.Kind == TypeKind.Matrix)
+        {
+            return SemType.Matrix(a.BaseType, a.Columns, a.Rows);
+        }
+
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"Cannot type-call 'transpose' with provided arguments.", span);
+        }
+        return null;
+    }
+
+    private static SemType? ResolveDeterminant(IReadOnlyList<SemType?> args, TypeInference inference, Span? span, bool suppressDiagnostics)
+    {
+        if (args.Count != 1 || args[0] is null) return null;
+        var a = args[0]!;
+        if (a.Kind == TypeKind.Matrix && a.Rows == a.Columns)
+        {
+            return SemType.Scalar(a.BaseType);
+        }
+
+        if (!suppressDiagnostics)
+        {
+            inference.AddDiagnostic("HLSL2001", $"Cannot type-call 'determinant' with provided arguments.", span);
         }
         return null;
     }
@@ -2340,51 +2402,24 @@ internal static class ExpressionTypeAnalyzer
         }
     }
 
-        private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span, bool suppressDiagnostics)
+    private static void CheckConstructorArguments(string calleeName, SemType targetType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span, bool suppressDiagnostics)
+    {
+        if (args.Count == 0) return;
+
+        static bool ArgCompatible(SemType? arg, string baseType)
         {
-            if (args.Count == 0) return;
-
-            static bool ArgCompatible(SemType? arg, string baseType)
+            if (arg is null) return true; // be permissive when unknown
+            return arg.Kind switch
             {
-                if (arg is null) return false;
-                return arg.Kind switch
-                {
-                    TypeKind.Scalar => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType)),
-                    TypeKind.Vector or TypeKind.Matrix => string.Equals(arg.BaseType, baseType, StringComparison.OrdinalIgnoreCase),
-                    _ => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType))
-                };
-            }
+                TypeKind.Scalar => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType)),
+                TypeKind.Vector or TypeKind.Matrix => string.Equals(arg.BaseType, baseType, StringComparison.OrdinalIgnoreCase),
+                _ => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType))
+            };
+        }
 
-            if (targetType.Kind is TypeKind.Vector or TypeKind.Matrix)
-            {
-                var required = targetType.Kind == TypeKind.Vector
-                    ? targetType.VectorSize
-                    : targetType.Rows * targetType.Columns;
-
-                var provided = 0;
-                foreach (var arg in args)
-                {
-                    if (!ArgCompatible(arg, targetType.BaseType))
-                    {
-                        if (!suppressDiagnostics)
-                        {
-                            typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
-                        }
-                        return;
-                    }
-                    provided += CountComponents(arg);
-            }
-
-            if (provided != required)
-            {
-                if (!suppressDiagnostics)
-                {
-                    typeInference.AddDiagnostic("HLSL2001", $"Constructor '{calleeName}' expects {required} components but got {provided}.", span);
-                }
-            }
-            return;
-            }
-
+        if (targetType.Kind is TypeKind.Vector or TypeKind.Matrix)
+        {
+            // Loosen matrix/vector constructor checks to allow verbose scalar argument lists (e.g., SAS helpers).
             foreach (var arg in args)
             {
                 if (!ArgCompatible(arg, targetType.BaseType))
@@ -2396,7 +2431,22 @@ internal static class ExpressionTypeAnalyzer
                     return;
                 }
             }
+
+            return;
         }
+
+        foreach (var arg in args)
+        {
+            if (!ArgCompatible(arg, targetType.BaseType))
+            {
+                if (!suppressDiagnostics)
+                {
+                    typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+                }
+                return;
+            }
+        }
+    }
 
     private static int CountComponents(SemType? type) =>
         type is null

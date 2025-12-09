@@ -21,15 +21,7 @@ internal static class ParseHelper
     public static string BuildAstJson(string source, string fileName = "stdin", string? filePath = null)
     {
         var defines = ResolveDefines(filePath ?? fileName);
-        var includeDirs = new List<string>();
-        if (!string.IsNullOrWhiteSpace(filePath))
-        {
-            var dir = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(dir))
-            {
-                includeDirs.Add(dir);
-            }
-        }
+        var includeDirs = ResolveIncludeDirectories(filePath);
 
         var preOptions = new PreprocessorOptions
         {
@@ -56,6 +48,59 @@ internal static class ParseHelper
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
+    }
+
+    private static IReadOnlyList<string> ResolveIncludeDirectories(string? filePath)
+    {
+        var dirs = new List<string>();
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return dirs;
+        }
+
+        var dir = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            dirs.Add(dir);
+        }
+
+        var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var dxsdkRoot = Path.Combine(repoRoot, "samples", "dxsdk");
+        var cursor = dir;
+        while (!string.IsNullOrEmpty(cursor) && cursor.StartsWith(dxsdkRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            var configPath = Path.Combine(cursor, "includes.json");
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var element in doc.RootElement.EnumerateArray())
+                        {
+                            if (element.ValueKind == JsonValueKind.String)
+                            {
+                                var rel = element.GetString() ?? string.Empty;
+                                if (!string.IsNullOrWhiteSpace(rel))
+                                {
+                                    var includeDir = Path.GetFullPath(Path.Combine(cursor, rel));
+                                    dirs.Add(includeDir);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore malformed include configs to keep sweeps running
+                }
+            }
+
+            cursor = Path.GetDirectoryName(cursor);
+        }
+
+        return dirs.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static IReadOnlyDictionary<string, string?> ResolveDefines(string path)

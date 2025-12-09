@@ -114,6 +114,7 @@ High-level shape of `output.sem.json`:
 - Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
 - Latest standard run (no sweep): 61 tests, 0 failed, 0 skipped (~1s). Full DXSDK sweep (`OPENFXC_SEM_FX_SWEEP=all`) is still noisy while FX semantic gaps are being closed.
 - DXSDK sweep macro overrides: `tests/data/defines.json` carries per-file macro hints (e.g., `/D MAX_INSTANCES=256`) that the test harness injects into the `openfxc-hlsl` preprocessor so DXSDK samples that rely on host-provided defines can parse without ad hoc edits.
+- Parser/sem analyzer now surface upstream (pre/lex/parse) diagnostics in the semantic output, so missing includes (e.g., `sas.fxh` in SharedFx) appear alongside sem-level diagnostics during sweeps.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`
