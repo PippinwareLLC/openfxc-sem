@@ -2455,7 +2455,13 @@ internal static class ExpressionTypeAnalyzer
 
             if (inferred is null)
             {
-                if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Kind == TypeKind.Function)
+                // If it looks like an intrinsic but we couldn't resolve (often due to unknown arg types), avoid
+                // falling back to constructor parsing so we don't turn 'normalize' into a bogus resource type.
+                if (Intrinsics.IsIntrinsic(calleeName!))
+                {
+                    inferred = null;
+                }
+                else if (symbolTypes.TryGetValue(calleeName!, out var fnType) && fnType is not null && fnType.Kind == TypeKind.Function)
                 {
                     inferred = fnType.ReturnType;
                     CheckCallCompatibility(calleeName!, fnType, argTypes, typeInference, node.Span, suppressDiagnostics);
