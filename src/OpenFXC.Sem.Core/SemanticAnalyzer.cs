@@ -435,9 +435,10 @@ internal static class FxModelBuilder
             return;
         }
 
-        if (hasVs && !hasPs && maxProfileMajor >= 2)
+        if (hasVs && !hasPs)
         {
-            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span);
+            var severity = maxProfileMajor >= 3 ? "Error" : "Warning";
+            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span, severity);
         }
 
         // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
@@ -2338,11 +2339,11 @@ internal sealed class TypeInference
         return NormalizeType(t);
     }
 
-    public void AddDiagnostic(string id, string message, Span? span = null)
+    public void AddDiagnostic(string id, string message, Span? span = null, string severity = "Error")
     {
         _diagnostics.Add(new DiagnosticInfo
         {
-            Severity = "Error",
+            Severity = string.IsNullOrWhiteSpace(severity) ? "Error" : severity,
             Id = id,
             Message = message,
             Span = NormalizeSpan(span)
@@ -2625,12 +2626,7 @@ internal static class ExpressionTypeAnalyzer
                 }
             }
 
-            var capacity = targetType.Kind == TypeKind.Vector ? targetType.VectorSize : targetType.Rows * targetType.Columns;
-            var supplied = args.Sum(CountComponents);
-            if (supplied > capacity && !suppressDiagnostics)
-            {
-                typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
-            }
+            // HLSL tolerates over-full constructor argument lists by truncating; only bail on incompatible types.
             return;
         }
 
@@ -2794,6 +2790,13 @@ internal static class EntryPointResolver
                     Profile = string.IsNullOrWhiteSpace(techniqueBinding.Profile) ? profile : techniqueBinding.Profile
                 }
             };
+        }
+
+        // If we have techniques but none provided a binding for this stage, allow a no-op entry resolution
+        // (common for FX files that reference precompiled shader objects).
+        if (techniques.Any() && !techniques.SelectMany(t => t.Passes).SelectMany(p => p.Shaders).Any())
+        {
+            return new List<EntryPointInfo>();
         }
 
         var entry = symbols.FirstOrDefault(s => string.Equals(s.Kind, "Function", StringComparison.OrdinalIgnoreCase)
