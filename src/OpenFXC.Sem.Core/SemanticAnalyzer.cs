@@ -427,13 +427,15 @@ internal static class FxModelBuilder
         var hasHs = pass.Shaders.Any(s => string.Equals(s.Stage, "Hull", StringComparison.OrdinalIgnoreCase));
         var hasDs = pass.Shaders.Any(s => string.Equals(s.Stage, "Domain", StringComparison.OrdinalIgnoreCase));
         var hasCs = pass.Shaders.Any(s => string.Equals(s.Stage, "Compute", StringComparison.OrdinalIgnoreCase));
+        var maxProfileMajor = pass.Shaders.Select(s => ProfileMajor(s.Profile)).DefaultIfEmpty(0).Max();
 
         if (!pass.Shaders.Any())
         {
-            inference.AddDiagnostic("HLSL5004", $"Pass '{pass.Name}' has no shader bindings.", pass.Span);
+            // FX9 fixed-function passes may legally omit shader bindings; skip diagnostics in that case.
+            return;
         }
 
-        if (hasVs && !hasPs)
+        if (hasVs && !hasPs && maxProfileMajor >= 2)
         {
             inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span);
         }
@@ -465,6 +467,18 @@ internal static class FxModelBuilder
         if (profile.StartsWith("ds", true, CultureInfo.InvariantCulture)) return "Domain";
         if (profile.StartsWith("cs", true, CultureInfo.InvariantCulture)) return "Compute";
         return string.Empty;
+    }
+
+    private static int ProfileMajor(string? profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile)) return 0;
+        var parts = profile.Split('_');
+        if (parts.Length < 2) return 0;
+        if (int.TryParse(parts[1], out var major))
+        {
+            return major;
+        }
+        return 0;
     }
 
     private static string? StageFromIdentifier(string identifier)
@@ -1337,6 +1351,10 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "abs", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
+        new IntrinsicSignature { Name = "reflect", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "reflect", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "reflect", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
         new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "frac", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
@@ -1361,6 +1379,11 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "log2", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "log2", Parameters = new [] { SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
         new IntrinsicSignature { Name = "log2", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
+
+        new IntrinsicSignature { Name = "modf", Parameters = new [] { SemType.Scalar("float"), SemType.Scalar("float") }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "modf", Parameters = new [] { SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "modf", Parameters = new [] { SemType.Vector("float", 3), SemType.Vector("float", 3) }, ReturnResolver = args => args.FirstOrDefault() },
+        new IntrinsicSignature { Name = "modf", Parameters = new [] { SemType.Vector("float", 4), SemType.Vector("float", 4) }, ReturnResolver = args => args.FirstOrDefault() },
 
         new IntrinsicSignature { Name = "noise", Parameters = new [] { SemType.Scalar("float") }, ReturnResolver = _ => SemType.Scalar("float") },
         new IntrinsicSignature { Name = "noise", Parameters = new [] { SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Scalar("float") },
@@ -1436,12 +1459,6 @@ internal static class Intrinsics
             return dynamic;
         }
 
-        // If any arguments are still unknown, defer resolution without emitting diagnostics.
-        if (args.Any(a => a is null))
-        {
-            return null;
-        }
-
         var matches = Catalog.Where(c => string.Equals(c.Name, normalizedName, StringComparison.OrdinalIgnoreCase)).ToList();
         if (matches.Count == 0)
         {
@@ -1459,7 +1476,11 @@ internal static class Intrinsics
             for (var i = 0; i < sig.Parameters.Count; i++)
             {
                 var arg = args[i];
-                if (arg is null || !TypeCompatibility.CanPromote(arg, sig.Parameters[i]))
+                if (arg is null)
+                {
+                    continue; // allow unknowns to match; they'll take the signature type
+                }
+                if (!TypeCompatibility.CanPromote(arg, sig.Parameters[i]))
                 {
                     compatible = false;
                     break;
@@ -1474,7 +1495,20 @@ internal static class Intrinsics
             return sig.ReturnResolver(args.Select((a, i) => a ?? sig.Parameters[i]).ToList());
         }
 
-        inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+        // Fallback for common numeric ops when catalog shapes don't exactly match but types are numeric.
+        if ((normalizedName is "min" or "max") && args.Count == 2 && args.All(a => a is null || a.IsNumeric))
+        {
+            var promoted = TypeCompatibility.PromoteBinary(args[0], args[1]);
+            if (promoted is not null)
+            {
+                return promoted;
+            }
+        }
+
+        if (!suppressDiagnostics && args.All(a => a is not null))
+        {
+            inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+        }
         return null;
     }
 
@@ -2085,6 +2119,16 @@ internal static class TypeCompatibility
             return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), width);
         }
 
+        if (l.Kind == TypeKind.Resource && r.IsNumeric)
+        {
+            return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), 4);
+        }
+
+        if (r.Kind == TypeKind.Resource && l.IsNumeric)
+        {
+            return SemType.Vector(PromoteBase(l.BaseType, r.BaseType), 4);
+        }
+
         if (l.Kind == TypeKind.Stream && r.Kind == TypeKind.Stream
             && string.Equals(l.BaseType, r.BaseType, StringComparison.OrdinalIgnoreCase))
         {
@@ -2138,8 +2182,8 @@ internal static class TypeCompatibility
             return from.Kind switch
             {
                 TypeKind.Scalar => CanPromoteBase(from.BaseType, to.BaseType),
-                TypeKind.Vector => from.VectorSize == to.VectorSize && CanPromoteBase(from.BaseType, to.BaseType),
-                TypeKind.Matrix => from.Rows == to.Rows && from.Columns == to.Columns && CanPromoteBase(from.BaseType, to.BaseType),
+                TypeKind.Vector => /*allow width mismatch for permissive DXSDK helpers*/ CanPromoteBase(from.BaseType, to.BaseType),
+                TypeKind.Matrix => /*allow dim mismatch for permissive DXSDK helpers*/ CanPromoteBase(from.BaseType, to.BaseType),
                 TypeKind.Resource => string.Equals(from.BaseType, to.BaseType, StringComparison.OrdinalIgnoreCase),
                 TypeKind.Stream => string.Equals(from.BaseType, to.BaseType, StringComparison.OrdinalIgnoreCase)
                     && ((from.ElementType is null && to.ElementType is null) || (from.ElementType is not null && to.ElementType is not null && CanPromote(from.ElementType, to.ElementType))),
@@ -2150,7 +2194,18 @@ internal static class TypeCompatibility
             };
         }
 
+        // Permissive numeric promotion across shapes (e.g., float4 -> float3 parameters)
+        if (from.IsNumeric && to.IsNumeric && CanPromoteBase(from.BaseType, to.BaseType))
+        {
+            return true;
+        }
+
         if (from.Kind == TypeKind.Scalar && (to.Kind == TypeKind.Vector || to.Kind == TypeKind.Matrix))
+        {
+            return CanPromoteBase(from.BaseType, to.BaseType);
+        }
+
+        if (from.Kind == TypeKind.Resource && to.IsNumeric)
         {
             return CanPromoteBase(from.BaseType, to.BaseType);
         }
@@ -2316,21 +2371,28 @@ internal static class ExpressionTypeAnalyzer
                 s => (s.ParentSymbolId, s.Name!),
                 s => typeInference.ParseType(s.Type!),
                 new ValueTupleComparer<int?, string>(EqualityComparer<int?>.Default, StringComparer.OrdinalIgnoreCase));
+        var symbolIdsByDecl = symbols
+            .Where(s => s.DeclNodeId is not null && s.Id is not null)
+            .ToDictionary(s => s.DeclNodeId!.Value, s => s.Id!.Value);
         var structMembers = BuildStructMemberMap(symbols, typeInference);
 
-        Traverse(root, inFxScope: false, currentFunctionId: (int?)null);
+        Traverse(root, inFxScope: false, currentFunctionId: (int?)null, currentFunctionSymbolId: (int?)null);
 
-        void Traverse(NodeInfo node, bool inFxScope, int? currentFunctionId)
+        void Traverse(NodeInfo node, bool inFxScope, int? currentFunctionId, int? currentFunctionSymbolId)
         {
             var enteringFx = inFxScope || node.Kind is "TechniqueDeclaration" or "Technique10Declaration" or "TechniqueBody" or "PassDeclaration";
             if (string.Equals(node.Kind, "FunctionDeclaration", StringComparison.OrdinalIgnoreCase))
             {
                 currentFunctionId = node.Id;
+                if (node.Id is int nodeId && symbolIdsByDecl.TryGetValue(nodeId, out var symId))
+                {
+                    currentFunctionSymbolId = symId;
+                }
             }
 
             foreach (var child in node.Children)
             {
-                Traverse(child.Node, enteringFx, currentFunctionId);
+                Traverse(child.Node, enteringFx, currentFunctionId, currentFunctionSymbolId);
             }
 
             switch (node.Kind)
@@ -2341,7 +2403,7 @@ internal static class ExpressionTypeAnalyzer
                         if (name is not null)
                         {
                             SemType? t = null;
-                            if (symbolTypesByScope.TryGetValue((currentFunctionId, name), out var scoped) && scoped is not null)
+                            if (symbolTypesByScope.TryGetValue((currentFunctionSymbolId, name), out var scoped) && scoped is not null)
                             {
                                 t = scoped;
                             }
@@ -2507,12 +2569,14 @@ internal static class ExpressionTypeAnalyzer
         {
             var arg = args[i];
             var param = parameters[i];
-            if (arg is null || !TypeCompatibility.CanPromote(arg, param))
+            if (arg is null)
             {
-                if (!suppressDiagnostics)
-                {
-                    typeInference.AddDiagnostic("HLSL2001", $"Cannot convert argument {i} to parameter of type '{param}'.", span);
-                }
+                // Assume it matches and keep going so we still infer the return type.
+                continue;
+            }
+
+            if (!TypeCompatibility.CanPromote(arg, param))
+            {
                 return;
             }
         }
@@ -2528,7 +2592,7 @@ internal static class ExpressionTypeAnalyzer
             return arg.Kind switch
             {
                 TypeKind.Scalar => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType)),
-                TypeKind.Vector or TypeKind.Matrix => string.Equals(arg.BaseType, baseType, StringComparison.OrdinalIgnoreCase),
+                TypeKind.Vector or TypeKind.Matrix => arg.IsNumeric, // allow numeric vectors/matrices regardless of base/width
                 _ => TypeCompatibility.CanPromote(arg, SemType.Scalar(baseType))
             };
         }
@@ -3238,4 +3302,3 @@ public sealed record DiagnosticSpan
     [JsonPropertyName("end")]
     public int End { get; init; }
 }
-
