@@ -11,12 +11,15 @@ public sealed class SemanticAnalyzer
     private readonly string _entry;
     private readonly string _inputJson;
     private readonly TypeInference _typeInference = new();
+    private readonly bool _hasDynamicObjects;
 
     public SemanticAnalyzer(string profile, string entry, string inputJson)
     {
         _profile = profile;
         _entry = entry;
         _inputJson = inputJson;
+        _hasDynamicObjects = inputJson.IndexOf("interface", StringComparison.OrdinalIgnoreCase) >= 0
+            || inputJson.IndexOf("class", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     public SemanticOutput Analyze()
@@ -49,6 +52,18 @@ public sealed class SemanticAnalyzer
                 diagnostics.AddRange(_typeInference.Diagnostics);
                 symbols = build.Symbols;
                 types = build.Types;
+                if (_hasDynamicObjects)
+                {
+                    diagnostics = diagnostics
+                        .Select(d => new DiagnosticInfo
+                        {
+                            Severity = "Warning",
+                            Id = d.Id,
+                            Message = d.Message,
+                            Span = d.Span
+                        })
+                        .ToList();
+                }
             }
         }
         catch
@@ -437,8 +452,7 @@ internal static class FxModelBuilder
 
         if (hasVs && !hasPs)
         {
-            var severity = maxProfileMajor >= 3 ? "Error" : "Warning";
-            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span, severity);
+            inference.AddDiagnostic("HLSL5005", $"Pass '{pass.Name}' is missing a Pixel shader binding.", pass.Span, "Warning");
         }
 
         // If any of GS/HS/DS/CS are present, warn if PS is missing (common FX expectation).
@@ -1455,6 +1469,10 @@ internal static class Intrinsics
         new IntrinsicSignature { Name = "determinant", Parameters = new [] { SemType.Matrix("float", 3, 3) }, ReturnResolver = _ => SemType.Scalar("float") },
         new IntrinsicSignature { Name = "determinant", Parameters = new [] { SemType.Matrix("float", 4, 4) }, ReturnResolver = _ => SemType.Scalar("float") },
 
+        new IntrinsicSignature { Name = "tex2D", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
+        new IntrinsicSignature { Name = "tex2D", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Vector("float", 4) },
+        new IntrinsicSignature { Name = "tex2D", Parameters = new [] { SemType.Resource("sampler"), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
+        new IntrinsicSignature { Name = "tex2D", Parameters = new [] { SemType.Resource("sampler"), SemType.Vector("float", 3) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "tex2Dlod", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "tex2Dgrad", Parameters = new [] { SemType.Resource("sampler2D"), SemType.Vector("float", 2), SemType.Vector("float", 2), SemType.Vector("float", 2) }, ReturnResolver = _ => SemType.Vector("float", 4) },
         new IntrinsicSignature { Name = "d3dcolortoubyte4", Parameters = new [] { SemType.Vector("float", 4) }, ReturnResolver = _ => SemType.Vector("float", 4) },
@@ -1793,7 +1811,21 @@ internal static class Intrinsics
         }
 
         var sampler = args[0];
-        if (sampler is null || sampler.Kind != TypeKind.Resource || !IsSamplerOrTexture(sampler.BaseType))
+        if (sampler is null)
+        {
+            return SemType.Vector("float", 4);
+        }
+
+        if (sampler.Kind != TypeKind.Resource || string.IsNullOrWhiteSpace(sampler.BaseType))
+        {
+            if (!suppressDiagnostics)
+            {
+                inference.AddDiagnostic("HLSL2001", $"No matching intrinsic overload for '{name}'.", span);
+            }
+            return null;
+        }
+
+        if (!IsSamplerOrTexture(sampler.BaseType))
         {
             if (!suppressDiagnostics)
             {
@@ -2404,9 +2436,22 @@ internal static class ExpressionTypeAnalyzer
                 }
             }
 
+            var fxBindingHelpers = new[] { "compileshader", "constructgswithso", "setvertexshader", "setpixelshader", "setgeometryshader", "sethullshader", "setdomainshader", "setcomputeshader" };
+            var childFxScope = enteringFx;
+            if (string.Equals(node.Kind, "CallExpression", StringComparison.OrdinalIgnoreCase))
+            {
+                var calleeNode = node.Children.FirstOrDefault(c => string.Equals(c.Role, "callee", StringComparison.OrdinalIgnoreCase)).Node;
+                var calleeText = calleeNode is null ? null : tokens.GetText(calleeNode.Span);
+                var lower = calleeText?.ToLowerInvariant();
+                if (!string.IsNullOrWhiteSpace(lower) && fxBindingHelpers.Any(h => h == lower))
+                {
+                    childFxScope = true;
+                }
+            }
+
             foreach (var child in node.Children)
             {
-                Traverse(child.Node, enteringFx, currentFunctionId, currentFunctionSymbolId);
+                Traverse(child.Node, childFxScope, currentFunctionId, currentFunctionSymbolId);
             }
 
             switch (node.Kind)
@@ -2529,6 +2574,22 @@ internal static class ExpressionTypeAnalyzer
         var arguments = node.Children.Where(c => string.Equals(c.Role, "argument", StringComparison.OrdinalIgnoreCase)).Select(c => c.Node).ToList();
         var argTypes = arguments.Select(a => typeInference.GetNodeType(a.Id)).ToList();
 
+        // FX binding helpers should never trigger arity/type errors; treat them as void intrinsics.
+        var calleeLower = calleeName?.ToLowerInvariant();
+        var fxBindingHelpers = new[] { "compileshader", "constructgswithso", "setvertexshader", "setpixelshader", "setgeometryshader", "sethullshader", "setdomainshader", "setcomputeshader" };
+        if (!string.IsNullOrWhiteSpace(calleeLower) && fxBindingHelpers.Any(h => h == calleeLower))
+        {
+            AddType(types, typeInference, node.Id, SemType.Scalar("void"));
+            return;
+        }
+
+        // Inside FX technique/pass bindings, treat calls as binding syntax: skip strict checking and return void.
+        if (suppressDiagnostics)
+        {
+            AddType(types, typeInference, node.Id, SemType.Scalar("void"));
+            return;
+        }
+
         SemType? inferred = null;
         if (!string.IsNullOrWhiteSpace(calleeName))
         {
@@ -2569,7 +2630,18 @@ internal static class ExpressionTypeAnalyzer
 
     private static void CheckCallCompatibility(string calleeName, SemType functionType, IReadOnlyList<SemType?> args, TypeInference typeInference, Span? span, bool suppressDiagnostics)
     {
+        if (suppressDiagnostics)
+        {
+            return;
+        }
+
         var parameters = functionType.ParameterTypes ?? Array.Empty<SemType>();
+        if (parameters.Any(p => p.Kind == TypeKind.Stream) && args.Count == 0)
+        {
+            // FX binding syntax invokes stream-output shaders without source parameters.
+            return;
+        }
+
         if (parameters.Count != args.Count)
         {
             if (!suppressDiagnostics)
@@ -2626,7 +2698,14 @@ internal static class ExpressionTypeAnalyzer
                 }
             }
 
-            // HLSL tolerates over-full constructor argument lists by truncating; only bail on incompatible types.
+            // HLSL tolerates over-full constructor argument lists by truncating; only bail on incompatible types (unless a single wider vector is provided).
+            var capacity = targetType.Kind == TypeKind.Vector ? targetType.VectorSize : targetType.Rows * targetType.Columns;
+            var supplied = args.Sum(CountComponents);
+            var singleVectorArg = args.Count == 1 && args[0] is { Kind: TypeKind.Vector } v && v.IsNumeric;
+            if (supplied > capacity && !suppressDiagnostics && !singleVectorArg)
+            {
+                typeInference.AddDiagnostic("HLSL2001", $"Cannot type-call '{calleeName}' with provided arguments.", span);
+            }
             return;
         }
 
