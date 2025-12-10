@@ -112,9 +112,17 @@ High-level shape of `output.sem.json`:
 - Suite layout: see `tests/README.md` (fixtures, snapshots, and unit/negative/integration tests).
 - Sample shaders for tests live under `samples/` (owned by this repo); integration smokes parse DXSDK samples via the `openfxc-hlsl` submodule before semantic analysis.
 - Default fast test target: a single DXSDK sample (`snow.fx`). Set `OPENFXC_SEM_FX_SWEEP=all` to sweep all `samples/dxsdk/**/*.fx` files.
-- Latest standard run (no sweep): 61 tests, 0 failed, 0 skipped (~1s). Full DXSDK sweep (`OPENFXC_SEM_FX_SWEEP=all`) is still noisy while FX semantic gaps are being closed.
+- Latest runs:
+  - Standard run (no sweep): 61 tests, 0 failed, 0 skipped (~1s).
+  - Full DXSDK sweep (`OPENFXC_SEM_FX_SWEEP=all`): passing against the current parser submodule and macro/define overrides.
 - DXSDK sweep macro overrides: `tests/data/defines.json` carries per-file macro hints (e.g., `/D MAX_INSTANCES=256`) that the test harness injects into the `openfxc-hlsl` preprocessor so DXSDK samples that rely on host-provided defines can parse without ad hoc edits.
 - Parser/sem analyzer now surface upstream (pre/lex/parse) diagnostics in the semantic output, so missing includes (e.g., `sas.fxh` in SharedFx) appear alongside sem-level diagnostics during sweeps.
+
+## Robustness backlog
+- Dynamic shader linkage: interface/class constructs are currently downgraded to warnings to keep FX11 DSL samples flowing; we should add proper interface typing and dispatch resolution.
+- Intrinsic breadth: broaden texture/sample overload coverage (tex* variants, resource types, coord shapes) and tighten sampler vs texture distinctions without breaking FX binding syntax.
+- FX binding semantics: revisit missing/duplicate semantic checks for FX techniques with unusual stage combinations and ensure entry resolution stays stable under profile mismatches.
+- Diagnostics polish: lift remaining nullability warnings in the analyzer and keep error/warning severities aligned between sem and profile layers.
 
 ## Docs
 - Full spec/TDD: `docs/TDD.md`
